@@ -404,8 +404,9 @@ async function syncPost(post) {
   if (!postRes.ok) throw new Error(`Could not fetch post: HTTP ${postRes.status}`);
   const fullPost=await postRes.json();
   let content=fullPost.content?.rendered||'';
-  const imgRegex=/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
-  const imageUrls=[...new Set(content.match(imgRegex)||[])];
+  const imgRegex = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
+  const allImgs = [...new Set(content.match(imgRegex) || [])];
+  const imageUrls = [...new Set(allImgs.map(url => url.replace(/-\d+x\d+(\.[^.]+)$/, '$1')))];
   log(`  Found ${imageUrls.length} images`,'info');
   const urlMap={};
   for (const imgUrl of imageUrls) {
