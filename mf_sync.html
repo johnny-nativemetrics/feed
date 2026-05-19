@@ -65,7 +65,6 @@
   .status-failed { background: rgba(255,61,107,0.1); color: var(--accent2); }
   .sync-bar { position: sticky; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .sync-info { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); flex: 1; }
-  .sync-info strong { color: var(--text); }
   .progress-bar { height: 3px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
   .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
   .log-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 16px; max-height: 200px; overflow-y: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.8; }
@@ -103,7 +102,7 @@
   </div>
   <div class="field">
     <label>MF Password</label>
-    <input type="password" id="mfPass" placeholder="WordPress password" />
+    <input type="password" id="mfPass" placeholder="Application password" />
   </div>
   <button class="btn btn-primary" onclick="loadPosts()">Load Posts</button>
 </div>
@@ -159,7 +158,6 @@ function toggleLog() {
 
 function setStatus(msg) { document.getElementById('syncStatus').textContent = msg; }
 function setProgress(pct) { document.getElementById('progressFill').style.width = pct + '%'; }
-
 function getAuth() {
   const u = document.getElementById('mfUser').value.trim();
   const p = document.getElementById('mfPass').value.trim();
@@ -169,10 +167,8 @@ function getAuth() {
 async function loadPosts(more = false) {
   const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
   if (!more) { currentPage = 1; posts = []; }
-
   const grid = document.getElementById('postsGrid');
   if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
-
   try {
     const url = `${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&_embed=1`;
     const res = await fetch(url);
@@ -281,19 +277,18 @@ async function syncPost(post) {
   const auth = getAuth();
   const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
 
-  // Get full post content
   const postRes = await fetch(`${sourceUrl}/wp-json/wp/v2/posts/${post.id}?_embed=1`);
   if (!postRes.ok) throw new Error(`Could not fetch post: HTTP ${postRes.status}`);
   const fullPost = await postRes.json();
 
   let content = fullPost.content?.rendered || '';
 
-  // Find all image URLs in content
+  // Find all image URLs
   const imgRegex = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
   const imageUrls = [...new Set(content.match(imgRegex) || [])];
   log(`  Found ${imageUrls.length} images`, 'info');
 
-  // Upload each image to MediaFeed
+  // Upload images to MediaFeed
   const urlMap = {};
   for (const imgUrl of imageUrls) {
     try {
@@ -305,11 +300,8 @@ async function syncPost(post) {
     }
   }
 
-  // Replace URLs in content
-  let finalContent = content;
-  for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
-    finalContent = finalContent.split(oldUrl).join(newUrl);
-  }
+  // Transform content to MediaFeed format
+  const transformed = transformContent(content, fullPost.title.rendered, urlMap, fullPost.link, sourceUrl);
 
   // Handle featured image
   let featuredMediaId = null;
@@ -317,9 +309,8 @@ async function syncPost(post) {
   if (featuredUrl) {
     const mappedUrl = urlMap[featuredUrl];
     if (mappedUrl) {
-      // Find the media ID on mediafeed
       try {
-        const fname = mappedUrl.split('/').pop().split('.')[0].replace(/-\d+x\d+$/, '');
+        const fname = mappedUrl.split('/').pop().split('.')[0].replace(/-\d+x\d+$/, '').replace(/-\d+$/, '');
         const searchRes = await fetch(`${mfUrl}/wp-json/wp/v2/media?search=${fname}&per_page=5`, {
           headers: { 'Authorization': auth }
         });
@@ -332,18 +323,14 @@ async function syncPost(post) {
   // Create post on MediaFeed as draft
   const body = {
     title: fullPost.title.rendered,
-    content: finalContent,
-    excerpt: fullPost.excerpt?.rendered || '',
+    content: transformed,
     status: 'draft',
     ...(featuredMediaId ? { featured_media: featuredMediaId } : {})
   };
 
   const createRes = await fetch(`${mfUrl}/wp-json/wp/v2/posts`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': auth
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify(body)
   });
 
@@ -357,27 +344,128 @@ async function syncPost(post) {
   return created;
 }
 
+function transformContent(content, title, urlMap, postUrl, sourceUrl) {
+  // Parse the content into a DOM
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, 'text/html');
+  const body = doc.body;
+
+  // Collect all top-level elements in order
+  const elements = Array.from(body.children);
+
+  // Separate intro paragraphs (before first h2) from items
+  let introParagraphs = [];
+  let items = []; // each item: { heading, image, paragraphs }
+  let currentItem = null;
+  let foundFirstH2 = false;
+
+  for (const el of elements) {
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === 'h2' || tag === 'h3') {
+      foundFirstH2 = true;
+      if (currentItem) items.push(currentItem);
+      currentItem = { heading: el.outerHTML, image: null, paragraphs: [] };
+    } else if (tag === 'figure' || (tag === 'p' && el.querySelector('img'))) {
+      if (!foundFirstH2) {
+        introParagraphs.push(el.outerHTML);
+      } else if (currentItem) {
+        // Extract image info
+        const img = el.querySelector('img');
+        const figcaption = el.querySelector('figcaption');
+        if (img) {
+          let src = img.getAttribute('src') || '';
+          // Replace with new URL if we have it
+          if (urlMap[src]) src = urlMap[src];
+          const alt = img.getAttribute('alt') || '';
+          const credit = figcaption ? figcaption.textContent.trim() : '';
+          currentItem.image = { src, alt, credit };
+        }
+      }
+    } else {
+      if (!foundFirstH2) {
+        introParagraphs.push(el.outerHTML);
+      } else if (currentItem) {
+        currentItem.paragraphs.push(el.outerHTML);
+      }
+    }
+  }
+  if (currentItem) items.push(currentItem);
+
+  // Now rebuild in MediaFeed format
+  let out = '';
+
+  // 1. Intro H2 from post title
+  out += `<!-- wp:heading -->\n<h2 class="wp-block-heading">${title}</h2>\n<!-- /wp:heading -->\n\n`;
+
+  // 2. Intro paragraphs
+  for (const p of introParagraphs) {
+    out += `<!-- wp:paragraph -->\n${p}\n<!-- /wp:paragraph -->\n\n`;
+  }
+
+  // 3. Items: image → h2 → paragraphs
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+
+    // Image for this item (goes BEFORE its h2)
+    if (item.image) {
+      out += buildCaptionBlock(item.image);
+    }
+
+    // H2
+    out += `<!-- wp:heading -->\n${item.heading}\n<!-- /wp:heading -->\n\n`;
+
+    // Paragraphs
+    for (const p of item.paragraphs) {
+      // Replace any remaining old image URLs in paragraphs
+      let updatedP = p;
+      for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
+        updatedP = updatedP.split(oldUrl).join(newUrl);
+      }
+      out += `<!-- wp:paragraph -->\n${updatedP}\n<!-- /wp:paragraph -->\n\n`;
+    }
+  }
+
+  // 4. Footer boilerplate
+  out += buildFooter(postUrl, sourceUrl);
+
+  return out;
+}
+
+function buildCaptionBlock(image) {
+  const { src, alt, credit } = image;
+  const filename = src.split('/').pop();
+  // Try to get width from filename (e.g. -1024x683)
+  const dimMatch = filename.match(/-(\d+)x(\d+)/);
+  const width = dimMatch ? dimMatch[1] : '780';
+  const height = dimMatch ? dimMatch[2] : '520';
+
+  return `<!-- wp:image {"sizeSlug":"large","linkDestination":"none"} -->\n<figure class="wp-block-image size-large">\n[caption align="alignnone" width="${width}"]<img src="${src}" alt="${alt}" width="${width}" height="${height}" /> ${credit}[/caption]\n</figure>\n<!-- /wp:image -->\n\n`;
+}
+
+function buildFooter(postUrl, sourceUrl) {
+  const sourceDomain = sourceUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
+  const sourceName = sourceDomain.split('.')[0].charAt(0).toUpperCase() + sourceDomain.split('.')[0].slice(1);
+
+  return `<!-- wp:paragraph -->\n<p><em>Ask us! What questions do you have about content, strategy, pop culture, lifestyle, wellness, history or more? We may use your question in an upcoming article!</em></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><a href="https://docs.google.com/forms/d/1wHBmZZrd4O0OAwQghNhg5fWe4mRpwt8KYbawDqiXyvY/edit"><em>Ask us a question</em></a></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><strong><em>Like MediaFeed's content?</em></strong><a href="https://www.msn.com/en-us/channel/source/Mediafeed/sr-vid-ckv6hf6hjif65e0cjnm83s7yb2y0w5xmun0j4refire0ev6727is"><strong><em> Be sure to follow us</em></strong></a><strong><em>.</em></strong></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><em>This article originally appeared on</em> <a href="${postUrl}" target="_blank" rel="noreferrer noopener"><em>${sourceName}</em></a> <em>and was syndicated by</em> <a href="http://mediafeed.co"><em>MediaFeed.co</em></a><em>.</em></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>&nbsp;</p>\n<!-- /wp:paragraph -->`;
+}
+
 async function uploadImage(imgUrl, mfUrl, auth) {
-  // Fetch image
   const imgRes = await fetch(imgUrl);
   if (!imgRes.ok) throw new Error(`Fetch failed: HTTP ${imgRes.status}`);
   const blob = await imgRes.blob();
   const filename = imgUrl.split('/').pop().split('?')[0] || 'image.jpg';
-
   const formData = new FormData();
   formData.append('file', blob, filename);
-
   const uploadRes = await fetch(`${mfUrl}/wp-json/wp/v2/media`, {
     method: 'POST',
     headers: { 'Authorization': auth },
     body: formData
   });
-
   if (!uploadRes.ok) {
     const err = await uploadRes.json().catch(() => ({}));
     throw new Error(err.message || `Upload HTTP ${uploadRes.status}`);
   }
-
   const data = await uploadRes.json();
   return data.source_url;
 }
