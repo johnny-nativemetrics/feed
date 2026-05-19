@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zipline → MediaFeed Sync</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #00e5ff;
+    --accent2: #ff3d6b;
+    --success: #00ff9d;
+    --warning: #ffb800;
+    --text: #e0e0f0;
+    --muted: #606080;
+    --card: #15151f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { color: var(--muted); }
+
+  .status-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--border);
+    color: var(--muted);
+  }
+
+  .status-badge.connected { background: rgba(0,255,157,0.1); color: var(--success); }
+  .status-badge.error { background: rgba(255,61,107,0.1); color: var(--accent2); }
+
+  .auth-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 160px;
+  }
+
+  label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  .btn-primary:hover { background: #33eaff; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-danger {
+    background: var(--accent2);
+    color: white;
+  }
+
+  .btn-danger:hover { background: #ff5a80; }
+  .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .source-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .selected-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .posts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .post-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .post-card:hover { border-color: var(--accent); background: #1a1a26; }
+  .post-card.selected { border-color: var(--accent); background: rgba(0,229,255,0.05); }
+  .post-card.synced { border-color: var(--success); background: rgba(0,255,157,0.03); }
+  .post-card.syncing { border-color: var(--warning); background: rgba(255,184,0,0.03); }
+  .post-card.failed { border-color: var(--accent2); background: rgba(255,61,107,0.03); }
+
+  .post-card.selected::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 3px 0 0 3px;
+  }
+
+  .checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+
+  .post-card.selected .checkbox {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .checkbox-tick {
+    display: none;
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .post-card.selected .checkbox-tick { display: block; }
+
+  .post-thumb {
+    width: 56px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--border);
+  }
+
+  .post-info { flex: 1; min-width: 0; }
+
+  .post-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+
+  .post-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .post-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+
+  .status-synced { background: rgba(0,255,157,0.1); color: var(--success); }
+  .status-syncing { background: rgba(255,184,0,0.1); color: var(--warning); }
+  .status-failed { background: rgba(255,61,107,0.1); color: var(--accent2); }
+  .status-pending { background: var(--border); color: var(--muted); }
+
+  .sync-bar {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    backdrop-filter: blur(10px);
+  }
+
+  .sync-info {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .sync-info strong { color: var(--text); }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 16px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+    display: none;
+  }
+
+  .log-line { color: var(--muted); }
+  .log-line.ok { color: var(--success); }
+  .log-line.err { color: var(--accent2); }
+  .log-line.info { color: var(--accent); }
+  .log-line.warn { color: var(--warning); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .select-all-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+  }
+  .select-all-btn:hover { color: var(--accent); }
+
+  .load-more-btn {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ZIPLINE <span>/</span> MediaFeed Sync</div>
+  <div class="status-badge" id="connectionStatus">Not connected</div>
+</header>
+
+<div class="auth-panel">
+  <div class="field">
+    <label>MediaFeed URL</label>
+    <input type="text" id="mfUrl" value="https://mediafeed.co" placeholder="https://mediafeed.co" />
+  </div>
+  <div class="field">
+    <label>Username</label>
+    <input type="text" id="mfUser" value="johnny" />
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="mfPass" placeholder="WordPress password" />
+  </div>
+  <div class="field">
+    <label>Source Site</label>
+    <input type="text" id="sourceUrl" value="https://resourcebuzz.com" placeholder="https://sourcesite.com" />
+  </div>
+  <button class="btn btn-ghost" onclick="loadPosts()">Load Posts</button>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <button class="select-all-btn" id="selectAllBtn" onclick="toggleSelectAll()">Select all</button>
+    <span class="selected-count" id="selectedCount"></span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost" onclick="loadPosts(true)" id="loadMoreBtn" style="display:none;font-size:12px;padding:8px 14px;">Load more</button>
+    <button class="btn btn-danger" id="syncBtn" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+  </div>
+</div>
+
+<div class="posts-grid" id="postsGrid">
+  <div class="empty-state">Enter credentials above and click Load Posts</div>
+</div>
+
+<div class="sync-bar" id="syncBar" style="display:none;">
+  <div class="sync-info">
+    <div id="syncStatus">Ready</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <button class="btn btn-ghost" onclick="toggleLog()" style="font-size:11px;padding:6px 12px;">Toggle log</button>
+</div>
+
+<div class="log-panel" id="logPanel"></div>
+
+<script>
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+
+let posts = [];
+let selected = new Set();
+let postStatuses = {};
+let currentPage = 1;
+let allLoaded = false;
+let syncing = false;
+
+function log(msg, type = '') {
+  const panel = document.getElementById('logPanel');
+  panel.style.display = 'block';
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+  line.textContent = `[${time}] ${msg}`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function toggleLog() {
+  const panel = document.getElementById('logPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function setStatus(msg) {
+  document.getElementById('syncStatus').textContent = msg;
+}
+
+function setProgress(pct) {
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+async function loadPosts(more = false) {
+  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
+  if (!sourceUrl) return alert('Enter source site URL');
+
+  if (!more) {
+    currentPage = 1;
+    posts = [];
+    allLoaded = false;
+  }
+
+  const grid = document.getElementById('postsGrid');
+  if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading posts...</div>';
+
+  try {
+    const url = `${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&_fields=id,title,date,author,featured_media,link,content,excerpt&_embed=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data.length < 20) allLoaded = true;
+    posts = more ? [...posts, ...data] : data;
+    currentPage++;
+
+    renderPosts();
+    document.getElementById('connectionStatus').className = 'status-badge connected';
+    document.getElementById('connectionStatus').textContent = `${posts.length} posts loaded`;
+    document.getElementById('loadMoreBtn').style.display = allLoaded ? 'none' : 'flex';
+    log(`Loaded ${data.length} posts from ${sourceUrl}`, 'ok');
+  } catch (e) {
+    grid.innerHTML = `<div class="empty-state">Failed to load posts: ${e.message}</div>`;
+    log(`Failed to load posts: ${e.message}`, 'err');
+    document.getElementById('connectionStatus').className = 'status-badge error';
+    document.getElementById('connectionStatus').textContent = 'Load failed';
+  }
+}
+
+function renderPosts() {
+  const grid = document.getElementById('postsGrid');
+  grid.innerHTML = '';
+
+  posts.forEach(post => {
+    const card = document.createElement('div');
+    card.className = `post-card${selected.has(post.id) ? ' selected' : ''}`;
+    const status = postStatuses[post.id];
+    if (status) card.classList.add(status);
+
+    const thumb = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+    const date = new Date(post.date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+
+    let statusHtml = '';
+    if (status === 'synced') statusHtml = '<span class="post-status status-synced">✓ Synced</span>';
+    else if (status === 'syncing') statusHtml = '<span class="post-status status-syncing"><span class="spinner"></span>Syncing</span>';
+    else if (status === 'failed') statusHtml = '<span class="post-status status-failed">✗ Failed</span>';
+
+    card.innerHTML = `
+      <div class="checkbox"><span class="checkbox-tick">✓</span></div>
+      ${thumb ? `<img class="post-thumb" src="${thumb}" alt="" onerror="this.style.display='none'">` : '<div class="post-thumb"></div>'}
+      <div class="post-info">
+        <div class="post-title">${post.title.rendered}</div>
+        <div class="post-meta">${date}</div>
+      </div>
+      ${statusHtml}
+    `;
+
+    if (status !== 'synced') {
+      card.onclick = () => toggleSelect(post.id, card);
+    }
+
+    grid.appendChild(card);
+  });
+
+  updateSyncBar();
+}
+
+function toggleSelect(id, card) {
+  if (selected.has(id)) {
+    selected.delete(id);
+    card.classList.remove('selected');
+  } else {
+    selected.add(id);
+    card.classList.add('selected');
+  }
+  updateSyncBar();
+}
+
+function toggleSelectAll() {
+  const unsynced = posts.filter(p => postStatuses[p.id] !== 'synced');
+  if (selected.size === unsynced.length) {
+    selected.clear();
+  } else {
+    unsynced.forEach(p => selected.add(p.id));
+  }
+  renderPosts();
+}
+
+function updateSyncBar() {
+  const count = selected.size;
+  document.getElementById('selectedCount').textContent = count > 0 ? `${count} selected` : '';
+  document.getElementById('syncBtn').disabled = count === 0 || syncing;
+  if (count > 0) document.getElementById('syncBar').style.display = 'flex';
+  setStatus(`${count} post${count !== 1 ? 's' : ''} selected`);
+}
+
+async function syncSelected() {
+  const mfUrl = document.getElementById('mfUrl').value.trim().replace(/\/$/, '');
+  const mfUser = document.getElementById('mfUser').value.trim();
+  const mfPass = document.getElementById('mfPass').value.trim();
+  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
+
+  if (!mfPass) return alert('Enter MediaFeed password');
+
+  const toSync = posts.filter(p => selected.has(p.id));
+  if (!toSync.length) return;
+
+  syncing = true;
+  document.getElementById('syncBtn').disabled = true;
+  let done = 0;
+
+  for (const post of toSync) {
+    postStatuses[post.id] = 'syncing';
+    renderPosts();
+    setStatus(`Syncing: ${post.title.rendered.substring(0, 40)}...`);
+    setProgress(Math.round((done / toSync.length) * 100));
+    log(`Starting sync: "${post.title.rendered}"`, 'info');
+
+    try {
+      await syncPost(post, sourceUrl, mfUrl, mfUser, mfPass);
+      postStatuses[post.id] = 'synced';
+      selected.delete(post.id);
+      log(`✓ Synced: "${post.title.rendered}"`, 'ok');
+    } catch (e) {
+      postStatuses[post.id] = 'failed';
+      log(`✗ Failed: "${post.title.rendered}" — ${e.message}`, 'err');
+    }
+
+    done++;
+    renderPosts();
+  }
+
+  setProgress(100);
+  setStatus(`Done — ${done} post${done !== 1 ? 's' : ''} processed`);
+  syncing = false;
+  document.getElementById('syncBtn').disabled = selected.size === 0;
+}
+
+async function syncPost(post, sourceUrl, mfUrl, mfUser, mfPass) {
+  const auth = btoa(`${mfUser}:${mfPass}`);
+  const content = post.content?.rendered || '';
+
+  // Use Claude to process content and handle image transfer
+  const prompt = `You are a WordPress content migration assistant. 
+
+I have a WordPress post that needs to be migrated from ${sourceUrl} to ${mfUrl}.
+
+The post title is: ${post.title.rendered}
+
+The post content (Classic Editor HTML format) is:
+${content}
+
+Your job:
+1. Parse the HTML content
+2. Find all image URLs (they will be from ${sourceUrl})
+3. For each image URL, I need you to fetch it and upload it to the destination WordPress site
+4. Return the processed content with image URLs replaced
+
+Since you cannot directly fetch/upload images, return a JSON object with this structure:
+{
+  "title": "post title",
+  "content": "the full HTML content exactly as provided, do not modify it",
+  "imageUrls": ["array", "of", "all", "image", "urls", "found", "in", "content"],
+  "featuredImageUrl": "url of featured/first image or null"
+}
+
+Return ONLY valid JSON, no other text.`;
+
+  const claudeRes = await fetch(ANTHROPIC_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  const claudeData = await claudeRes.json();
+  const parsed = JSON.parse(claudeData.content[0].text);
+
+  // Upload images to MediaFeed and build URL map
+  const urlMap = {};
+  for (const imgUrl of parsed.imageUrls || []) {
+    try {
+      const newUrl = await uploadImageToMediaFeed(imgUrl, mfUrl, auth);
+      if (newUrl) {
+        urlMap[imgUrl] = newUrl;
+        log(`  Image uploaded: ${imgUrl.split('/').pop()}`, 'ok');
+      }
+    } catch (e) {
+      log(`  Image failed: ${imgUrl.split('/').pop()} — ${e.message}`, 'warn');
+    }
+  }
+
+  // Replace image URLs in content
+  let finalContent = parsed.content;
+  for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
+    finalContent = finalContent.split(oldUrl).join(newUrl);
+  }
+
+  // Upload featured image
+  let featuredMediaId = null;
+  if (parsed.featuredImageUrl) {
+    const mappedUrl = urlMap[parsed.featuredImageUrl] || parsed.featuredImageUrl;
+    // Get media ID from the uploaded URL
+    const mediaSlug = mappedUrl.split('/').pop().split('.')[0];
+    try {
+      const searchRes = await fetch(`${mfUrl}/wp-json/wp/v2/media?search=${mediaSlug}&per_page=1`, {
+        headers: { 'Authorization': `Basic ${auth}` }
+      });
+      const mediaData = await searchRes.json();
+      if (mediaData[0]) featuredMediaId = mediaData[0].id;
+    } catch(e) {}
+  }
+
+  // Create post on MediaFeed
+  const postData = {
+    title: parsed.title,
+    content: finalContent,
+    status: 'draft',
+    ...(featuredMediaId ? { featured_media: featuredMediaId } : {})
+  };
+
+  const createRes = await fetch(`${mfUrl}/wp-json/wp/v2/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${auth}`
+    },
+    body: JSON.stringify(postData)
+  });
+
+  if (!createRes.ok) {
+    const err = await createRes.json();
+    throw new Error(err.message || `HTTP ${createRes.status}`);
+  }
+
+  return await createRes.json();
+}
+
+async function uploadImageToMediaFeed(imageUrl, mfUrl, auth) {
+  // Fetch the image via Claude API as a proxy
+  const proxyPrompt = `Fetch this image URL and return its base64 encoded content and mime type as JSON:
+URL: ${imageUrl}
+
+Return ONLY this JSON structure:
+{"base64": "base64_data_here", "mimeType": "image/jpeg", "filename": "filename.jpg"}
+
+If you cannot fetch it, return: {"error": "reason"}`;
+
+  const proxyRes = await fetch(ANTHROPIC_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: proxyPrompt }]
+    })
+  });
+
+  const proxyData = await proxyRes.json();
+  const imgData = JSON.parse(proxyData.content[0].text);
+
+  if (imgData.error) throw new Error(imgData.error);
+
+  // Convert base64 to blob and upload
+  const binary = atob(imgData.base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: imgData.mimeType });
+
+  const filename = imageUrl.split('/').pop().split('?')[0] || 'image.jpg';
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+
+  const uploadRes = await fetch(`${mfUrl}/wp-json/wp/v2/media`, {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${auth}` },
+    body: formData
+  });
+
+  if (!uploadRes.ok) throw new Error(`Upload failed: HTTP ${uploadRes.status}`);
+  const uploadData = await uploadRes.json();
+  return uploadData.source_url;
+}
+</script>
+</body>
+</html>
