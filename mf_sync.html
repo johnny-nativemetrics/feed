@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zipline → MediaFeed Sync</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #00e5ff;
+    --accent2: #ff3d6b;
+    --success: #00ff9d;
+    --warning: #ffb800;
+    --text: #e0e0f0;
+    --muted: #606080;
+    --card: #15151f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .logo { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; color: var(--accent); }
+  .logo span { color: var(--muted); }
+  .status-badge { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 4px 10px; border-radius: 20px; background: var(--border); color: var(--muted); }
+  .status-badge.connected { background: rgba(0,255,157,0.1); color: var(--success); }
+  .status-badge.error { background: rgba(255,61,107,0.1); color: var(--accent2); }
+  .auth-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+  label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.2s; }
+  input:focus { border-color: var(--accent); }
+  .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { background: #33eaff; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger { background: var(--accent2); color: white; }
+  .btn-danger:hover { background: #ff5a80; }
+  .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+  .toolbar-left { display: flex; align-items: center; gap: 12px; }
+  .selected-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
+  .posts-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .post-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; }
+  .post-card:hover { border-color: var(--accent); background: #1a1a26; }
+  .post-card.selected { border-color: var(--accent); background: rgba(0,229,255,0.05); }
+  .post-card.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); border-radius: 3px 0 0 3px; }
+  .post-card.synced { border-color: var(--success); background: rgba(0,255,157,0.03); cursor: default; }
+  .post-card.syncing { border-color: var(--warning); }
+  .post-card.failed { border-color: var(--accent2); }
+  .checkbox { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  .post-card.selected .checkbox { background: var(--accent); border-color: var(--accent); }
+  .checkbox-tick { display: none; color: var(--bg); font-size: 11px; font-weight: 700; }
+  .post-card.selected .checkbox-tick { display: block; }
+  .post-thumb { width: 56px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--border); }
+  .post-info { flex: 1; min-width: 0; }
+  .post-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .post-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .post-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+  .status-synced { background: rgba(0,255,157,0.1); color: var(--success); }
+  .status-syncing { background: rgba(255,184,0,0.1); color: var(--warning); }
+  .status-failed { background: rgba(255,61,107,0.1); color: var(--accent2); }
+  .sync-bar { position: sticky; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .sync-info { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); flex: 1; }
+  .sync-info strong { color: var(--text); }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
+  .log-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 16px; max-height: 200px; overflow-y: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.8; }
+  .log-line { color: var(--muted); }
+  .log-line.ok { color: var(--success); }
+  .log-line.err { color: var(--accent2); }
+  .log-line.info { color: var(--accent); }
+  .log-line.warn { color: var(--warning); }
+  .empty-state { text-align: center; padding: 48px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .select-all-btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; }
+  .select-all-btn:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ZIPLINE <span>/</span> MediaFeed Sync</div>
+  <div class="status-badge" id="connectionStatus">Not connected</div>
+</header>
+
+<div class="auth-panel">
+  <div class="field">
+    <label>Source Site</label>
+    <input type="text" id="sourceUrl" value="https://resourcebuzz.com" />
+  </div>
+  <div class="field">
+    <label>MediaFeed URL</label>
+    <input type="text" id="mfUrl" value="https://mediafeed.co" />
+  </div>
+  <div class="field">
+    <label>MF Username</label>
+    <input type="text" id="mfUser" value="johnny" />
+  </div>
+  <div class="field">
+    <label>MF Password</label>
+    <input type="password" id="mfPass" placeholder="WordPress password" />
+  </div>
+  <button class="btn btn-primary" onclick="loadPosts()">Load Posts</button>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <button class="select-all-btn" onclick="toggleSelectAll()">Select all</button>
+    <span class="selected-count" id="selectedCount"></span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost" onclick="loadPosts(true)" id="loadMoreBtn" style="display:none;font-size:12px;padding:8px 14px;">Load more</button>
+    <button class="btn btn-danger" id="syncBtn" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+  </div>
+</div>
+
+<div class="posts-grid" id="postsGrid">
+  <div class="empty-state">Enter credentials and click Load Posts</div>
+</div>
+
+<div class="sync-bar" id="syncBar" style="display:none;">
+  <div class="sync-info">
+    <div id="syncStatus">Ready</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <button class="btn btn-ghost" onclick="toggleLog()" style="font-size:11px;padding:6px 12px;">Log</button>
+  <button class="btn btn-danger" id="syncBtn2" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+</div>
+
+<div class="log-panel" id="logPanel" style="display:none;"></div>
+
+<script>
+let posts = [];
+let selected = new Set();
+let postStatuses = {};
+let currentPage = 1;
+let syncing = false;
+
+function log(msg, type = '') {
+  const panel = document.getElementById('logPanel');
+  panel.style.display = 'block';
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  const time = new Date().toLocaleTimeString('en-US', {hour12:false});
+  line.textContent = `[${time}] ${msg}`;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function toggleLog() {
+  const p = document.getElementById('logPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function setStatus(msg) { document.getElementById('syncStatus').textContent = msg; }
+function setProgress(pct) { document.getElementById('progressFill').style.width = pct + '%'; }
+
+function getAuth() {
+  const u = document.getElementById('mfUser').value.trim();
+  const p = document.getElementById('mfPass').value.trim();
+  return 'Basic ' + btoa(`${u}:${p}`);
+}
+
+async function loadPosts(more = false) {
+  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
+  if (!more) { currentPage = 1; posts = []; }
+
+  const grid = document.getElementById('postsGrid');
+  if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+
+  try {
+    const url = `${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&_embed=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    posts = more ? [...posts, ...data] : data;
+    currentPage++;
+    document.getElementById('loadMoreBtn').style.display = data.length < 20 ? 'none' : 'flex';
+    renderPosts();
+    const badge = document.getElementById('connectionStatus');
+    badge.className = 'status-badge connected';
+    badge.textContent = `${posts.length} posts`;
+    log(`Loaded ${data.length} posts`, 'ok');
+  } catch(e) {
+    grid.innerHTML = `<div class="empty-state">Error: ${e.message}</div>`;
+    document.getElementById('connectionStatus').className = 'status-badge error';
+    document.getElementById('connectionStatus').textContent = 'Failed';
+    log(`Load failed: ${e.message}`, 'err');
+  }
+}
+
+function renderPosts() {
+  const grid = document.getElementById('postsGrid');
+  grid.innerHTML = '';
+  posts.forEach(post => {
+    const st = postStatuses[post.id];
+    const card = document.createElement('div');
+    card.className = `post-card${selected.has(post.id) ? ' selected' : ''}${st ? ' ' + st : ''}`;
+    const thumb = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
+    const date = new Date(post.date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    let statusHtml = '';
+    if (st === 'synced') statusHtml = '<span class="post-status status-synced">✓ Synced</span>';
+    else if (st === 'syncing') statusHtml = '<span class="post-status status-syncing"><span class="spinner"></span>Syncing</span>';
+    else if (st === 'failed') statusHtml = '<span class="post-status status-failed">✗ Failed</span>';
+    card.innerHTML = `
+      <div class="checkbox"><span class="checkbox-tick">✓</span></div>
+      ${thumb ? `<img class="post-thumb" src="${thumb}" onerror="this.style.display='none'" alt="">` : '<div class="post-thumb"></div>'}
+      <div class="post-info">
+        <div class="post-title">${post.title.rendered}</div>
+        <div class="post-meta">${date}</div>
+      </div>
+      ${statusHtml}
+    `;
+    if (st !== 'synced') card.onclick = () => toggleSelect(post.id);
+    grid.appendChild(card);
+  });
+  updateUI();
+}
+
+function toggleSelect(id) {
+  if (selected.has(id)) selected.delete(id);
+  else selected.add(id);
+  renderPosts();
+}
+
+function toggleSelectAll() {
+  const unsynced = posts.filter(p => postStatuses[p.id] !== 'synced').map(p => p.id);
+  if (selected.size === unsynced.length) selected.clear();
+  else unsynced.forEach(id => selected.add(id));
+  renderPosts();
+}
+
+function updateUI() {
+  const count = selected.size;
+  document.getElementById('selectedCount').textContent = count > 0 ? `${count} selected` : '';
+  const disabled = count === 0 || syncing;
+  document.getElementById('syncBtn').disabled = disabled;
+  document.getElementById('syncBtn2').disabled = disabled;
+  document.getElementById('syncBar').style.display = count > 0 || syncing ? 'flex' : 'none';
+  if (!syncing) setStatus(`${count} post${count !== 1 ? 's' : ''} selected`);
+}
+
+async function syncSelected() {
+  if (!document.getElementById('mfPass').value.trim()) return alert('Enter MediaFeed password first');
+  const toSync = posts.filter(p => selected.has(p.id));
+  if (!toSync.length) return;
+  syncing = true;
+  updateUI();
+  let done = 0;
+  for (const post of toSync) {
+    postStatuses[post.id] = 'syncing';
+    renderPosts();
+    setStatus(`Syncing ${done + 1}/${toSync.length}: ${post.title.rendered.substring(0, 35)}...`);
+    setProgress(Math.round((done / toSync.length) * 100));
+    log(`→ Starting: "${post.title.rendered}"`, 'info');
+    try {
+      await syncPost(post);
+      postStatuses[post.id] = 'synced';
+      selected.delete(post.id);
+      log(`✓ Done: "${post.title.rendered}"`, 'ok');
+    } catch(e) {
+      postStatuses[post.id] = 'failed';
+      log(`✗ Failed: "${post.title.rendered}" — ${e.message}`, 'err');
+    }
+    done++;
+    renderPosts();
+  }
+  setProgress(100);
+  setStatus(`Finished — ${done} post${done !== 1 ? 's' : ''} processed`);
+  syncing = false;
+  updateUI();
+}
+
+async function syncPost(post) {
+  const mfUrl = document.getElementById('mfUrl').value.trim().replace(/\/$/, '');
+  const auth = getAuth();
+  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
+
+  // Get full post content
+  const postRes = await fetch(`${sourceUrl}/wp-json/wp/v2/posts/${post.id}?_embed=1`);
+  if (!postRes.ok) throw new Error(`Could not fetch post: HTTP ${postRes.status}`);
+  const fullPost = await postRes.json();
+
+  let content = fullPost.content?.rendered || '';
+
+  // Find all image URLs in content
+  const imgRegex = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
+  const imageUrls = [...new Set(content.match(imgRegex) || [])];
+  log(`  Found ${imageUrls.length} images`, 'info');
+
+  // Upload each image to MediaFeed
+  const urlMap = {};
+  for (const imgUrl of imageUrls) {
+    try {
+      const newUrl = await uploadImage(imgUrl, mfUrl, auth);
+      urlMap[imgUrl] = newUrl;
+      log(`  ✓ Image: ${imgUrl.split('/').pop()}`, 'ok');
+    } catch(e) {
+      log(`  ⚠ Image skip: ${imgUrl.split('/').pop()} — ${e.message}`, 'warn');
+    }
+  }
+
+  // Replace URLs in content
+  let finalContent = content;
+  for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
+    finalContent = finalContent.split(oldUrl).join(newUrl);
+  }
+
+  // Handle featured image
+  let featuredMediaId = null;
+  const featuredUrl = fullPost._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+  if (featuredUrl) {
+    const mappedUrl = urlMap[featuredUrl];
+    if (mappedUrl) {
+      // Find the media ID on mediafeed
+      try {
+        const fname = mappedUrl.split('/').pop().split('.')[0].replace(/-\d+x\d+$/, '');
+        const searchRes = await fetch(`${mfUrl}/wp-json/wp/v2/media?search=${fname}&per_page=5`, {
+          headers: { 'Authorization': auth }
+        });
+        const mediaList = await searchRes.json();
+        if (mediaList[0]) featuredMediaId = mediaList[0].id;
+      } catch(e) {}
+    }
+  }
+
+  // Create post on MediaFeed as draft
+  const body = {
+    title: fullPost.title.rendered,
+    content: finalContent,
+    excerpt: fullPost.excerpt?.rendered || '',
+    status: 'draft',
+    ...(featuredMediaId ? { featured_media: featuredMediaId } : {})
+  };
+
+  const createRes = await fetch(`${mfUrl}/wp-json/wp/v2/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': auth
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!createRes.ok) {
+    const err = await createRes.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${createRes.status}`);
+  }
+
+  const created = await createRes.json();
+  log(`  Created draft #${created.id} on MediaFeed`, 'ok');
+  return created;
+}
+
+async function uploadImage(imgUrl, mfUrl, auth) {
+  // Fetch image
+  const imgRes = await fetch(imgUrl);
+  if (!imgRes.ok) throw new Error(`Fetch failed: HTTP ${imgRes.status}`);
+  const blob = await imgRes.blob();
+  const filename = imgUrl.split('/').pop().split('?')[0] || 'image.jpg';
+
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+
+  const uploadRes = await fetch(`${mfUrl}/wp-json/wp/v2/media`, {
+    method: 'POST',
+    headers: { 'Authorization': auth },
+    body: formData
+  });
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json().catch(() => ({}));
+    throw new Error(err.message || `Upload HTTP ${uploadRes.status}`);
+  }
+
+  const data = await uploadRes.json();
+  return data.source_url;
+}
+</script>
+</body>
+</html>
