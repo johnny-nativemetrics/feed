@@ -272,7 +272,7 @@ async function loadPosts(more=false) {
   const grid = document.getElementById('postsGrid');
   if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading Gallery posts...</div>';
   try {
-    const res = await fetch(`${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&tags=${RB_GALLERY_TAG_ID}&_embed=1`);
+    const res = await fetch(`${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&tags=${RB_GALLERY_TAG_ID}&_embed=1&_=${Date.now()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     posts = more ? [...posts,...data] : data;
