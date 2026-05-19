@@ -7,31 +7,32 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
   :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --border: #1e1e2e;
-    --accent: #00e5ff;
-    --accent2: #ff3d6b;
-    --success: #00ff9d;
-    --warning: #ffb800;
-    --text: #e0e0f0;
-    --muted: #606080;
-    --card: #15151f;
+    --bg: #0a0a0f; --surface: #12121a; --border: #1e1e2e;
+    --accent: #00e5ff; --accent2: #ff3d6b; --success: #00ff9d;
+    --warning: #ffb800; --text: #e0e0f0; --muted: #606080; --card: #15151f;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  html, body { height: 100%; }
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    padding: 0;
+  }
+  .top-section { flex-shrink: 0; padding: 20px 24px 0; overflow-y: auto; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
   .logo { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; color: var(--accent); }
   .logo span { color: var(--muted); }
   .status-badge { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 4px 10px; border-radius: 20px; background: var(--border); color: var(--muted); }
   .status-badge.connected { background: rgba(0,255,157,0.1); color: var(--success); }
   .status-badge.error { background: rgba(255,61,107,0.1); color: var(--accent2); }
-  .auth-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+  .auth-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
   label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-  input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.2s; }
-  input:focus { border-color: var(--accent); }
-  .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
+  input, select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px; outline: none; transition: border-color 0.2s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  input[type="date"] { color-scheme: dark; }
+  .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
   .btn-primary { background: var(--accent); color: var(--bg); }
   .btn-primary:hover { background: #33eaff; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -40,435 +41,453 @@
   .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
   .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+  .btn-sm { padding: 6px 12px; font-size: 11px; }
+  .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .stats-bar { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+  .stat { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .stat strong { color: var(--text); }
+  .stat.green strong { color: var(--success); }
+  .stat.blue strong { color: var(--accent); }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
   .toolbar-left { display: flex; align-items: center; gap: 12px; }
   .selected-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
-  .posts-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
-  .post-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; }
+  .select-all-btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; }
+  .select-all-btn:hover { color: var(--accent); }
+  .posts-wrapper { flex: 1; overflow-y: auto; padding: 0 24px; min-height: 0; }
+  .posts-grid { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+  .post-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; }
   .post-card:hover { border-color: var(--accent); background: #1a1a26; }
   .post-card.selected { border-color: var(--accent); background: rgba(0,229,255,0.05); }
   .post-card.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); border-radius: 3px 0 0 3px; }
   .post-card.synced { border-color: var(--success); background: rgba(0,255,157,0.03); cursor: default; }
   .post-card.syncing { border-color: var(--warning); }
   .post-card.failed { border-color: var(--accent2); }
-  .checkbox { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  .checkbox { width: 16px; height: 16px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
   .post-card.selected .checkbox { background: var(--accent); border-color: var(--accent); }
-  .checkbox-tick { display: none; color: var(--bg); font-size: 11px; font-weight: 700; }
+  .checkbox-tick { display: none; color: var(--bg); font-size: 10px; font-weight: 700; }
   .post-card.selected .checkbox-tick { display: block; }
-  .post-thumb { width: 56px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--border); }
+  .post-thumb { width: 48px; height: 34px; border-radius: 5px; object-fit: cover; flex-shrink: 0; background: var(--border); }
   .post-info { flex: 1; min-width: 0; }
-  .post-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-  .post-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
-  .post-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+  .post-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .post-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+  .post-status { font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
   .status-synced { background: rgba(0,255,157,0.1); color: var(--success); }
   .status-syncing { background: rgba(255,184,0,0.1); color: var(--warning); }
   .status-failed { background: rgba(255,61,107,0.1); color: var(--accent2); }
-  .sync-bar { position: sticky; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .bottom-section { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--surface); }
+  .sync-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; }
   .sync-info { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); flex: 1; }
-  .progress-bar { height: 3px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden; }
   .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
-  .log-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 16px; max-height: 200px; overflow-y: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.8; }
+  .log-resize-handle { height: 6px; background: var(--border); cursor: ns-resize; border-top: 1px solid #2a2a3e; display: flex; align-items: center; justify-content: center; }
+  .log-resize-handle::after { content: '⣿'; font-size: 8px; color: var(--muted); letter-spacing: -1px; }
+  .log-panel { height: 120px; overflow-y: auto; padding: 10px 24px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.8; background: var(--bg); min-height: 60px; max-height: 400px; }
   .log-line { color: var(--muted); }
   .log-line.ok { color: var(--success); }
   .log-line.err { color: var(--accent2); }
   .log-line.info { color: var(--accent); }
   .log-line.warn { color: var(--warning); }
-  .empty-state { text-align: center; padding: 48px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
-  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .select-all-btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; }
-  .select-all-btn:hover { color: var(--accent); }
+  .history-bar { display: flex; align-items: center; gap: 8px; padding: 6px 24px; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); background: var(--surface); }
+  .history-bar strong { color: var(--accent); }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">ZIPLINE <span>/</span> MediaFeed Sync</div>
-  <div class="status-badge" id="connectionStatus">Not connected</div>
-</header>
+<div class="top-section">
+  <header>
+    <div class="logo">ZIPLINE <span>/</span> MediaFeed Sync</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="status-badge" id="connectionStatus">Not connected</div>
+      <button class="btn btn-ghost btn-sm" onclick="exportHistory()">Export History</button>
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer;">Import History<input type="file" accept=".json" onchange="importHistory(this)" style="display:none;"></label>
+      <button class="btn btn-ghost btn-sm" onclick="if(confirm('Clear all sync history?')){clearHistory();}">Clear History</button>
+    </div>
+  </header>
 
-<div class="auth-panel">
-  <div class="field">
-    <label>Source Site</label>
-    <input type="text" id="sourceUrl" value="https://resourcebuzz.com" />
+  <div class="auth-panel">
+    <div class="field">
+      <label>Source Site</label>
+      <input type="text" id="sourceUrl" value="https://resourcebuzz.com" />
+    </div>
+    <div class="field">
+      <label>MediaFeed URL</label>
+      <input type="text" id="mfUrl" value="https://mediafeed.co" />
+    </div>
+    <div class="field">
+      <label>MF Username</label>
+      <input type="text" id="mfUser" value="jenny" />
+    </div>
+    <div class="field">
+      <label>MF Password</label>
+      <input type="password" id="mfPass" placeholder="Application password" />
+    </div>
+    <button class="btn btn-primary" onclick="loadPosts()">Load Posts</button>
   </div>
-  <div class="field">
-    <label>MediaFeed URL</label>
-    <input type="text" id="mfUrl" value="https://mediafeed.co" />
+
+  <div class="filter-bar">
+    <div class="field" style="flex:0;min-width:140px;">
+      <label>From Date</label>
+      <input type="date" id="filterFrom" onchange="applyFilters()" />
+    </div>
+    <div class="field" style="flex:0;min-width:140px;">
+      <label>To Date</label>
+      <input type="date" id="filterTo" onchange="applyFilters()" />
+    </div>
+    <div class="field" style="flex:0;min-width:130px;">
+      <label>Status</label>
+      <select id="filterStatus" onchange="applyFilters()">
+        <option value="all">All</option>
+        <option value="unsynced">Not synced</option>
+        <option value="synced">Already synced</option>
+      </select>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()" style="margin-top:18px;">Clear filters</button>
+    <button class="btn btn-ghost btn-sm" onclick="loadPosts(true)" id="loadMoreBtn" style="display:none;margin-top:18px;">Load more</button>
   </div>
-  <div class="field">
-    <label>MF Username</label>
-    <input type="text" id="mfUser" value="johnny" />
+
+  <div class="stats-bar" id="statsBar" style="display:none;">
+    <div class="stat blue"><strong id="statTotal">0</strong> Gallery posts</div>
+    <div class="stat green"><strong id="statSynced">0</strong> already synced</div>
+    <div class="stat"><strong id="statPending">0</strong> ready to sync</div>
+    <div class="stat"><strong id="statFiltered">0</strong> shown</div>
   </div>
-  <div class="field">
-    <label>MF Password</label>
-    <input type="password" id="mfPass" placeholder="Application password" />
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button class="select-all-btn" onclick="toggleSelectAll()">Select all visible unsynced</button>
+      <span class="selected-count" id="selectedCount"></span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-danger" id="syncBtn" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+    </div>
   </div>
-  <button class="btn btn-primary" onclick="loadPosts()">Load Posts</button>
 </div>
 
-<div class="toolbar">
-  <div class="toolbar-left">
-    <button class="select-all-btn" onclick="toggleSelectAll()">Select all</button>
-    <span class="selected-count" id="selectedCount"></span>
-  </div>
-  <div style="display:flex;gap:8px;">
-    <button class="btn btn-ghost" onclick="loadPosts(true)" id="loadMoreBtn" style="display:none;font-size:12px;padding:8px 14px;">Load more</button>
-    <button class="btn btn-danger" id="syncBtn" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+<div class="posts-wrapper" id="postsWrapper">
+  <div class="posts-grid" id="postsGrid">
+    <div class="empty-state">Enter credentials and click Load Posts</div>
   </div>
 </div>
 
-<div class="posts-grid" id="postsGrid">
-  <div class="empty-state">Enter credentials and click Load Posts</div>
-</div>
-
-<div class="sync-bar" id="syncBar" style="display:none;">
-  <div class="sync-info">
-    <div id="syncStatus">Ready</div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+<div class="bottom-section">
+  <div class="history-bar">
+    <span>Sync history: <strong id="historyCount">0</strong> posts tracked locally</span>
   </div>
-  <button class="btn btn-ghost" onclick="toggleLog()" style="font-size:11px;padding:6px 12px;">Log</button>
-  <button class="btn btn-danger" id="syncBtn2" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+  <div class="sync-bar">
+    <div class="sync-info">
+      <div id="syncStatus">Ready</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <button class="btn btn-danger" id="syncBtn2" onclick="syncSelected()" disabled>Sync to MediaFeed</button>
+  </div>
+  <div class="log-resize-handle" id="resizeHandle"></div>
+  <div class="log-panel" id="logPanel">
+    <div class="log-line info">[ready] Zipline → MediaFeed Sync Tool v5</div>
+  </div>
 </div>
-
-<div class="log-panel" id="logPanel" style="display:none;"></div>
 
 <script>
-let posts = [];
-let selected = new Set();
-let postStatuses = {};
-let currentPage = 1;
-let syncing = false;
+const RB_GALLERY_TAG_ID = 17;
+const MF_SLIDESHOW_CAT_ID = 458;
+const LS_KEY = 'zipline_synced_ids';
 
-function log(msg, type = '') {
+let posts = [], filteredPosts = [], selected = new Set(), postStatuses = {};
+let currentPage = 1, syncing = false, syncedIds = new Set();
+
+function loadSyncedIds() {
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) syncedIds = new Set(JSON.parse(raw)); } catch(e) {}
+  updateHistoryCount();
+}
+function saveSyncedId(id) {
+  syncedIds.add(String(id));
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...syncedIds])); } catch(e) {}
+  updateHistoryCount();
+}
+function updateHistoryCount() { document.getElementById('historyCount').textContent = syncedIds.size; }
+function clearHistory() {
+  syncedIds.clear();
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  updateHistoryCount();
+  postStatuses = {};
+  renderPosts();
+  log('Sync history cleared', 'warn');
+}
+function exportHistory() {
+  const blob = new Blob([JSON.stringify([...syncedIds], null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `zipline-sync-history-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log(`Exported ${syncedIds.size} synced post IDs`, 'ok');
+}
+function importHistory(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const ids = JSON.parse(e.target.result);
+      ids.forEach(id => syncedIds.add(String(id)));
+      localStorage.setItem(LS_KEY, JSON.stringify([...syncedIds]));
+      updateHistoryCount();
+      posts.forEach(p => { if (syncedIds.has(String(p.id))) postStatuses[p.id] = 'synced'; });
+      renderPosts(); updateStats();
+      log(`Imported ${ids.length} IDs, total now ${syncedIds.size}`, 'ok');
+    } catch(err) { log('Import failed: invalid file', 'err'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function log(msg, type='') {
   const panel = document.getElementById('logPanel');
-  panel.style.display = 'block';
   const line = document.createElement('div');
   line.className = `log-line ${type}`;
-  const time = new Date().toLocaleTimeString('en-US', {hour12:false});
-  line.textContent = `[${time}] ${msg}`;
+  line.textContent = `[${new Date().toLocaleTimeString('en-US',{hour12:false})}] ${msg}`;
   panel.appendChild(line);
   panel.scrollTop = panel.scrollHeight;
 }
 
-function toggleLog() {
-  const p = document.getElementById('logPanel');
-  p.style.display = p.style.display === 'none' ? 'block' : 'none';
-}
-
 function setStatus(msg) { document.getElementById('syncStatus').textContent = msg; }
 function setProgress(pct) { document.getElementById('progressFill').style.width = pct + '%'; }
-function getAuth() {
-  const u = document.getElementById('mfUser').value.trim();
-  const p = document.getElementById('mfPass').value.trim();
-  return 'Basic ' + btoa(`${u}:${p}`);
-}
+function getAuth() { return 'Basic ' + btoa(`${document.getElementById('mfUser').value.trim()}:${document.getElementById('mfPass').value.trim()}`); }
 
-async function loadPosts(more = false) {
-  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
-  if (!more) { currentPage = 1; posts = []; }
+(function() {
+  const handle = document.getElementById('resizeHandle');
+  const panel = document.getElementById('logPanel');
+  let dragging=false, startY=0, startH=0;
+  handle.addEventListener('mousedown', e => { dragging=true; startY=e.clientY; startH=panel.offsetHeight; document.body.style.userSelect='none'; });
+  document.addEventListener('mousemove', e => { if(!dragging) return; panel.style.height = Math.min(400,Math.max(60,startH+(startY-e.clientY)))+'px'; });
+  document.addEventListener('mouseup', () => { dragging=false; document.body.style.userSelect=''; });
+})();
+
+async function loadPosts(more=false) {
+  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/,'');
+  if (!document.getElementById('mfPass').value.trim()) return alert('Enter MediaFeed password first');
+  if (!more) { currentPage=1; posts=[]; postStatuses={}; selected.clear(); }
   const grid = document.getElementById('postsGrid');
-  if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+  if (!more) grid.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading Gallery posts...</div>';
   try {
-    const url = `${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&_embed=1`;
-    const res = await fetch(url);
+    const res = await fetch(`${sourceUrl}/wp-json/wp/v2/posts?per_page=20&page=${currentPage}&tags=${RB_GALLERY_TAG_ID}&_embed=1`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    posts = more ? [...posts, ...data] : data;
+    posts = more ? [...posts,...data] : data;
     currentPage++;
+    posts.forEach(p => { if (syncedIds.has(String(p.id))) postStatuses[p.id]='synced'; });
     document.getElementById('loadMoreBtn').style.display = data.length < 20 ? 'none' : 'flex';
-    renderPosts();
+    document.getElementById('statsBar').style.display = 'flex';
+    applyFilters();
     const badge = document.getElementById('connectionStatus');
-    badge.className = 'status-badge connected';
-    badge.textContent = `${posts.length} posts`;
-    log(`Loaded ${data.length} posts`, 'ok');
+    badge.className='status-badge connected';
+    badge.textContent=`${posts.length} Gallery posts`;
+    log(`Loaded ${data.length} Gallery posts`, 'ok');
   } catch(e) {
-    grid.innerHTML = `<div class="empty-state">Error: ${e.message}</div>`;
-    document.getElementById('connectionStatus').className = 'status-badge error';
-    document.getElementById('connectionStatus').textContent = 'Failed';
-    log(`Load failed: ${e.message}`, 'err');
+    grid.innerHTML=`<div class="empty-state">Error: ${e.message}</div>`;
+    document.getElementById('connectionStatus').className='status-badge error';
+    document.getElementById('connectionStatus').textContent='Failed';
+    log(`Load failed: ${e.message}`,'err');
   }
 }
 
+function applyFilters() {
+  const from=document.getElementById('filterFrom').value;
+  const to=document.getElementById('filterTo').value;
+  const status=document.getElementById('filterStatus').value;
+  filteredPosts = posts.filter(p => {
+    const date=p.date.split('T')[0];
+    if (from && date<from) return false;
+    if (to && date>to) return false;
+    const st=postStatuses[p.id];
+    if (status==='synced' && st!=='synced') return false;
+    if (status==='unsynced' && st==='synced') return false;
+    return true;
+  });
+  renderPosts(); updateStats();
+}
+
+function clearFilters() {
+  document.getElementById('filterFrom').value='';
+  document.getElementById('filterTo').value='';
+  document.getElementById('filterStatus').value='all';
+  applyFilters();
+}
+
+function updateStats() {
+  const total=posts.length, synced=posts.filter(p=>postStatuses[p.id]==='synced').length;
+  document.getElementById('statTotal').textContent=total;
+  document.getElementById('statSynced').textContent=synced;
+  document.getElementById('statPending').textContent=total-synced;
+  document.getElementById('statFiltered').textContent=filteredPosts.length;
+}
+
 function renderPosts() {
-  const grid = document.getElementById('postsGrid');
-  grid.innerHTML = '';
-  posts.forEach(post => {
-    const st = postStatuses[post.id];
-    const card = document.createElement('div');
-    card.className = `post-card${selected.has(post.id) ? ' selected' : ''}${st ? ' ' + st : ''}`;
-    const thumb = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || '';
-    const date = new Date(post.date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-    let statusHtml = '';
-    if (st === 'synced') statusHtml = '<span class="post-status status-synced">✓ Synced</span>';
-    else if (st === 'syncing') statusHtml = '<span class="post-status status-syncing"><span class="spinner"></span>Syncing</span>';
-    else if (st === 'failed') statusHtml = '<span class="post-status status-failed">✗ Failed</span>';
-    card.innerHTML = `
+  const grid=document.getElementById('postsGrid');
+  grid.innerHTML='';
+  if (!filteredPosts.length) { grid.innerHTML='<div class="empty-state">No posts match the current filter</div>'; updateUI(); return; }
+  filteredPosts.forEach(post => {
+    const st=postStatuses[post.id];
+    const card=document.createElement('div');
+    card.className=`post-card${selected.has(post.id)?' selected':''}${st?' '+st:''}`;
+    const thumb=post._embedded?.['wp:featuredmedia']?.[0]?.source_url||'';
+    const date=new Date(post.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    let statusHtml='';
+    if (st==='synced') statusHtml='<span class="post-status status-synced">✓ On MediaFeed</span>';
+    else if (st==='syncing') statusHtml='<span class="post-status status-syncing"><span class="spinner"></span>Syncing</span>';
+    else if (st==='failed') statusHtml='<span class="post-status status-failed">✗ Failed</span>';
+    card.innerHTML=`
       <div class="checkbox"><span class="checkbox-tick">✓</span></div>
-      ${thumb ? `<img class="post-thumb" src="${thumb}" onerror="this.style.display='none'" alt="">` : '<div class="post-thumb"></div>'}
+      ${thumb?`<img class="post-thumb" src="${thumb}" onerror="this.style.display='none'" alt="">`:'<div class="post-thumb"></div>'}
       <div class="post-info">
         <div class="post-title">${post.title.rendered}</div>
         <div class="post-meta">${date}</div>
       </div>
       ${statusHtml}
     `;
-    if (st !== 'synced') card.onclick = () => toggleSelect(post.id);
+    if (st!=='synced') card.onclick=()=>toggleSelect(post.id);
     grid.appendChild(card);
   });
   updateUI();
 }
 
-function toggleSelect(id) {
-  if (selected.has(id)) selected.delete(id);
-  else selected.add(id);
-  renderPosts();
-}
-
+function toggleSelect(id) { if(selected.has(id)) selected.delete(id); else selected.add(id); renderPosts(); }
 function toggleSelectAll() {
-  const unsynced = posts.filter(p => postStatuses[p.id] !== 'synced').map(p => p.id);
-  if (selected.size === unsynced.length) selected.clear();
-  else unsynced.forEach(id => selected.add(id));
+  const unsynced=filteredPosts.filter(p=>postStatuses[p.id]!=='synced').map(p=>p.id);
+  const allSel=unsynced.every(id=>selected.has(id));
+  if(allSel) unsynced.forEach(id=>selected.delete(id)); else unsynced.forEach(id=>selected.add(id));
   renderPosts();
 }
-
 function updateUI() {
-  const count = selected.size;
-  document.getElementById('selectedCount').textContent = count > 0 ? `${count} selected` : '';
-  const disabled = count === 0 || syncing;
-  document.getElementById('syncBtn').disabled = disabled;
-  document.getElementById('syncBtn2').disabled = disabled;
-  document.getElementById('syncBar').style.display = count > 0 || syncing ? 'flex' : 'none';
-  if (!syncing) setStatus(`${count} post${count !== 1 ? 's' : ''} selected`);
+  const count=selected.size, disabled=count===0||syncing;
+  document.getElementById('selectedCount').textContent=count>0?`${count} selected`:'';
+  document.getElementById('syncBtn').disabled=disabled;
+  document.getElementById('syncBtn2').disabled=disabled;
+  if(!syncing) setStatus(`${count} post${count!==1?'s':''} selected — ready to sync`);
 }
 
 async function syncSelected() {
   if (!document.getElementById('mfPass').value.trim()) return alert('Enter MediaFeed password first');
-  const toSync = posts.filter(p => selected.has(p.id));
+  const toSync=posts.filter(p=>selected.has(p.id));
   if (!toSync.length) return;
-  syncing = true;
-  updateUI();
-  let done = 0;
+  syncing=true; updateUI();
+  let done=0;
   for (const post of toSync) {
-    postStatuses[post.id] = 'syncing';
-    renderPosts();
-    setStatus(`Syncing ${done + 1}/${toSync.length}: ${post.title.rendered.substring(0, 35)}...`);
-    setProgress(Math.round((done / toSync.length) * 100));
+    postStatuses[post.id]='syncing'; renderPosts();
+    setStatus(`Syncing ${done+1}/${toSync.length}: ${post.title.rendered.substring(0,35)}...`);
+    setProgress(Math.round((done/toSync.length)*100));
     log(`→ Starting: "${post.title.rendered}"`, 'info');
     try {
       await syncPost(post);
-      postStatuses[post.id] = 'synced';
+      postStatuses[post.id]='synced';
+      saveSyncedId(post.id);
       selected.delete(post.id);
       log(`✓ Done: "${post.title.rendered}"`, 'ok');
     } catch(e) {
-      postStatuses[post.id] = 'failed';
+      postStatuses[post.id]='failed';
       log(`✗ Failed: "${post.title.rendered}" — ${e.message}`, 'err');
     }
-    done++;
-    renderPosts();
+    done++; renderPosts(); updateStats();
   }
   setProgress(100);
-  setStatus(`Finished — ${done} post${done !== 1 ? 's' : ''} processed`);
-  syncing = false;
-  updateUI();
+  setStatus(`Finished — ${done} post${done!==1?'s':''} processed`);
+  syncing=false; updateUI();
 }
 
 async function syncPost(post) {
-  const mfUrl = document.getElementById('mfUrl').value.trim().replace(/\/$/, '');
-  const auth = getAuth();
-  const sourceUrl = document.getElementById('sourceUrl').value.trim().replace(/\/$/, '');
-
-  const postRes = await fetch(`${sourceUrl}/wp-json/wp/v2/posts/${post.id}?_embed=1`);
+  const mfUrl=document.getElementById('mfUrl').value.trim().replace(/\/$/,'');
+  const auth=getAuth();
+  const sourceUrl=document.getElementById('sourceUrl').value.trim().replace(/\/$/,'');
+  const postRes=await fetch(`${sourceUrl}/wp-json/wp/v2/posts/${post.id}?_embed=1`);
   if (!postRes.ok) throw new Error(`Could not fetch post: HTTP ${postRes.status}`);
-  const fullPost = await postRes.json();
-
-  let content = fullPost.content?.rendered || '';
-
-  // Find all image URLs
-  const imgRegex = /https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
-  const imageUrls = [...new Set(content.match(imgRegex) || [])];
-  log(`  Found ${imageUrls.length} images`, 'info');
-
-  // Upload images to MediaFeed
-  const urlMap = {};
+  const fullPost=await postRes.json();
+  let content=fullPost.content?.rendered||'';
+  const imgRegex=/https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
+  const imageUrls=[...new Set(content.match(imgRegex)||[])];
+  log(`  Found ${imageUrls.length} images`,'info');
+  const urlMap={};
   for (const imgUrl of imageUrls) {
+    try { urlMap[imgUrl]=await uploadImage(imgUrl,mfUrl,auth); log(`  ✓ ${imgUrl.split('/').pop()}`,'ok'); }
+    catch(e) { log(`  ⚠ Skip: ${imgUrl.split('/').pop()} — ${e.message}`,'warn'); }
+  }
+  const transformed=transformContent(content,fullPost.title.rendered,urlMap,fullPost.link,sourceUrl);
+  let featuredMediaId=null;
+  const featuredUrl=fullPost._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+  if (featuredUrl&&urlMap[featuredUrl]) {
     try {
-      const newUrl = await uploadImage(imgUrl, mfUrl, auth);
-      urlMap[imgUrl] = newUrl;
-      log(`  ✓ Image: ${imgUrl.split('/').pop()}`, 'ok');
-    } catch(e) {
-      log(`  ⚠ Image skip: ${imgUrl.split('/').pop()} — ${e.message}`, 'warn');
-    }
+      const fname=urlMap[featuredUrl].split('/').pop().split('.')[0].replace(/-\d+x\d+$/,'').replace(/-\d+$/,'');
+      const sr=await fetch(`${mfUrl}/wp-json/wp/v2/media?search=${fname}&per_page=5`,{headers:{'Authorization':auth}});
+      const ml=await sr.json(); if(ml[0]) featuredMediaId=ml[0].id;
+    } catch(e) {}
   }
-
-  // Transform content to MediaFeed format
-  const transformed = transformContent(content, fullPost.title.rendered, urlMap, fullPost.link, sourceUrl);
-
-  // Handle featured image
-  let featuredMediaId = null;
-  const featuredUrl = fullPost._embedded?.['wp:featuredmedia']?.[0]?.source_url;
-  if (featuredUrl) {
-    const mappedUrl = urlMap[featuredUrl];
-    if (mappedUrl) {
-      try {
-        const fname = mappedUrl.split('/').pop().split('.')[0].replace(/-\d+x\d+$/, '').replace(/-\d+$/, '');
-        const searchRes = await fetch(`${mfUrl}/wp-json/wp/v2/media?search=${fname}&per_page=5`, {
-          headers: { 'Authorization': auth }
-        });
-        const mediaList = await searchRes.json();
-        if (mediaList[0]) featuredMediaId = mediaList[0].id;
-      } catch(e) {}
-    }
-  }
-
-  // Create post on MediaFeed as draft
-  const body = {
-    title: fullPost.title.rendered,
-    content: transformed,
-    status: 'draft',
-    ...(featuredMediaId ? { featured_media: featuredMediaId } : {})
-  };
-
-  const createRes = await fetch(`${mfUrl}/wp-json/wp/v2/posts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': auth },
-    body: JSON.stringify(body)
-  });
-
-  if (!createRes.ok) {
-    const err = await createRes.json().catch(() => ({}));
-    throw new Error(err.message || `HTTP ${createRes.status}`);
-  }
-
-  const created = await createRes.json();
-  log(`  Created draft #${created.id} on MediaFeed`, 'ok');
+  const body={title:fullPost.title.rendered,content:transformed,status:'draft',categories:[MF_SLIDESHOW_CAT_ID],...(featuredMediaId?{featured_media:featuredMediaId}:{})};
+  const createRes=await fetch(`${mfUrl}/wp-json/wp/v2/posts`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':auth},body:JSON.stringify(body)});
+  if (!createRes.ok) { const err=await createRes.json().catch(()=>({})); throw new Error(err.message||`HTTP ${createRes.status}`); }
+  const created=await createRes.json();
+  log(`  Draft #${created.id} created with Slideshow category`,'ok');
   return created;
 }
 
-function transformContent(content, title, urlMap, postUrl, sourceUrl) {
-  // Parse the content into a DOM
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(content, 'text/html');
-  const body = doc.body;
-
-  // Collect all top-level elements in order
-  const elements = Array.from(body.children);
-
-  // Separate intro paragraphs (before first h2) from items
-  let introParagraphs = [];
-  let items = []; // each item: { heading, image, paragraphs }
-  let currentItem = null;
-  let foundFirstH2 = false;
-
+function transformContent(content,title,urlMap,postUrl,sourceUrl) {
+  const parser=new DOMParser();
+  const elements=Array.from(parser.parseFromString(content,'text/html').body.children);
+  let introParagraphs=[],items=[],currentItem=null,foundFirstH2=false;
   for (const el of elements) {
-    const tag = el.tagName.toLowerCase();
-
-    if (tag === 'h2' || tag === 'h3') {
-      foundFirstH2 = true;
-      if (currentItem) items.push(currentItem);
-      currentItem = { heading: el.outerHTML, image: null, paragraphs: [] };
-    } else if (tag === 'figure' || (tag === 'p' && el.querySelector('img'))) {
-      if (!foundFirstH2) {
-        introParagraphs.push(el.outerHTML);
-      } else if (currentItem) {
-        // Extract image info
-        const img = el.querySelector('img');
-        const figcaption = el.querySelector('figcaption');
-        if (img) {
-          let src = img.getAttribute('src') || '';
-          // Replace with new URL if we have it
-          if (urlMap[src]) src = urlMap[src];
-          const alt = img.getAttribute('alt') || '';
-          const credit = figcaption ? figcaption.textContent.trim() : '';
-          currentItem.image = { src, alt, credit };
-        }
+    const tag=el.tagName.toLowerCase();
+    if (tag==='h2'||tag==='h3') {
+      foundFirstH2=true;
+      if(currentItem) items.push(currentItem);
+      currentItem={heading:el.outerHTML,image:null,paragraphs:[]};
+    } else if (tag==='figure'||el.querySelector?.('img')) {
+      if(!foundFirstH2){introParagraphs.push(el.outerHTML);}
+      else if(currentItem){
+        const img=el.querySelector('img'),figcaption=el.querySelector('figcaption');
+        if(img){let src=img.getAttribute('src')||'';if(urlMap[src])src=urlMap[src];currentItem.image={src,alt:img.getAttribute('alt')||'',credit:figcaption?figcaption.textContent.trim():''};}
       }
     } else {
-      if (!foundFirstH2) {
-        introParagraphs.push(el.outerHTML);
-      } else if (currentItem) {
-        currentItem.paragraphs.push(el.outerHTML);
-      }
+      if(!foundFirstH2){introParagraphs.push(el.outerHTML);}
+      else if(currentItem){let html=el.outerHTML;for(const[o,n]of Object.entries(urlMap))html=html.split(o).join(n);currentItem.paragraphs.push(html);}
     }
   }
-  if (currentItem) items.push(currentItem);
-
-  // Now rebuild in MediaFeed format
-  let out = '';
-
-  // 1. Intro H2 from post title
-  out += `<!-- wp:heading -->\n<h2 class="wp-block-heading">${title}</h2>\n<!-- /wp:heading -->\n\n`;
-
-  // 2. Intro paragraphs
-  for (const p of introParagraphs) {
-    out += `<!-- wp:paragraph -->\n${p}\n<!-- /wp:paragraph -->\n\n`;
+  if(currentItem) items.push(currentItem);
+  let out=`<!-- wp:heading -->\n<h2 class="wp-block-heading">${title}</h2>\n<!-- /wp:heading -->\n\n`;
+  for(const p of introParagraphs) out+=`<!-- wp:paragraph -->\n${p}\n<!-- /wp:paragraph -->\n\n`;
+  for(const item of items){
+    if(item.image) out+=buildCaptionBlock(item.image);
+    out+=`<!-- wp:heading -->\n${item.heading}\n<!-- /wp:heading -->\n\n`;
+    for(const p of item.paragraphs) out+=`<!-- wp:paragraph -->\n${p}\n<!-- /wp:paragraph -->\n\n`;
   }
-
-  // 3. Items: image → h2 → paragraphs
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-
-    // Image for this item (goes BEFORE its h2)
-    if (item.image) {
-      out += buildCaptionBlock(item.image);
-    }
-
-    // H2
-    out += `<!-- wp:heading -->\n${item.heading}\n<!-- /wp:heading -->\n\n`;
-
-    // Paragraphs
-    for (const p of item.paragraphs) {
-      // Replace any remaining old image URLs in paragraphs
-      let updatedP = p;
-      for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
-        updatedP = updatedP.split(oldUrl).join(newUrl);
-      }
-      out += `<!-- wp:paragraph -->\n${updatedP}\n<!-- /wp:paragraph -->\n\n`;
-    }
-  }
-
-  // 4. Footer boilerplate
-  out += buildFooter(postUrl, sourceUrl);
-
+  out+=buildFooter(postUrl,sourceUrl);
   return out;
 }
 
-function buildCaptionBlock(image) {
-  const { src, alt, credit } = image;
-  const filename = src.split('/').pop();
-  // Try to get width from filename (e.g. -1024x683)
-  const dimMatch = filename.match(/-(\d+)x(\d+)/);
-  const width = dimMatch ? dimMatch[1] : '780';
-  const height = dimMatch ? dimMatch[2] : '520';
-
+function buildCaptionBlock({src,alt,credit}){
+  const filename=src.split('/').pop(),dimMatch=filename.match(/-(\d+)x(\d+)/);
+  const width=dimMatch?dimMatch[1]:'780',height=dimMatch?dimMatch[2]:'520';
   return `<!-- wp:image {"sizeSlug":"large","linkDestination":"none"} -->\n<figure class="wp-block-image size-large">\n[caption align="alignnone" width="${width}"]<img src="${src}" alt="${alt}" width="${width}" height="${height}" /> ${credit}[/caption]\n</figure>\n<!-- /wp:image -->\n\n`;
 }
 
-function buildFooter(postUrl, sourceUrl) {
-  const sourceDomain = sourceUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
-  const sourceName = sourceDomain.split('.')[0].charAt(0).toUpperCase() + sourceDomain.split('.')[0].slice(1);
-
+function buildFooter(postUrl,sourceUrl){
+  const sourceDomain=sourceUrl.replace(/https?:\/\//,'').replace(/\/$/,'');
+  const sourceName=sourceDomain.split('.')[0].charAt(0).toUpperCase()+sourceDomain.split('.')[0].slice(1);
   return `<!-- wp:paragraph -->\n<p><em>Ask us! What questions do you have about content, strategy, pop culture, lifestyle, wellness, history or more? We may use your question in an upcoming article!</em></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><a href="https://docs.google.com/forms/d/1wHBmZZrd4O0OAwQghNhg5fWe4mRpwt8KYbawDqiXyvY/edit"><em>Ask us a question</em></a></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><strong><em>Like MediaFeed's content?</em></strong><a href="https://www.msn.com/en-us/channel/source/Mediafeed/sr-vid-ckv6hf6hjif65e0cjnm83s7yb2y0w5xmun0j4refire0ev6727is"><strong><em> Be sure to follow us</em></strong></a><strong><em>.</em></strong></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p><em>This article originally appeared on</em> <a href="${postUrl}" target="_blank" rel="noreferrer noopener"><em>${sourceName}</em></a> <em>and was syndicated by</em> <a href="http://mediafeed.co"><em>MediaFeed.co</em></a><em>.</em></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>&nbsp;</p>\n<!-- /wp:paragraph -->`;
 }
 
-async function uploadImage(imgUrl, mfUrl, auth) {
-  const imgRes = await fetch(imgUrl);
-  if (!imgRes.ok) throw new Error(`Fetch failed: HTTP ${imgRes.status}`);
-  const blob = await imgRes.blob();
-  const filename = imgUrl.split('/').pop().split('?')[0] || 'image.jpg';
-  const formData = new FormData();
-  formData.append('file', blob, filename);
-  const uploadRes = await fetch(`${mfUrl}/wp-json/wp/v2/media`, {
-    method: 'POST',
-    headers: { 'Authorization': auth },
-    body: formData
-  });
-  if (!uploadRes.ok) {
-    const err = await uploadRes.json().catch(() => ({}));
-    throw new Error(err.message || `Upload HTTP ${uploadRes.status}`);
-  }
-  const data = await uploadRes.json();
-  return data.source_url;
+async function uploadImage(imgUrl,mfUrl,auth){
+  const imgRes=await fetch(imgUrl);
+  if(!imgRes.ok) throw new Error(`Fetch failed: HTTP ${imgRes.status}`);
+  const blob=await imgRes.blob();
+  const filename=imgUrl.split('/').pop().split('?')[0]||'image.jpg';
+  const formData=new FormData();
+  formData.append('file',blob,filename);
+  const uploadRes=await fetch(`${mfUrl}/wp-json/wp/v2/media`,{method:'POST',headers:{'Authorization':auth},body:formData});
+  if(!uploadRes.ok){const err=await uploadRes.json().catch(()=>({}));throw new Error(err.message||`Upload HTTP ${uploadRes.status}`);}
+  return(await uploadRes.json()).source_url;
 }
+
+loadSyncedIds();
 </script>
 </body>
 </html>
