@@ -435,6 +435,7 @@
     <button class="btn btn-primary" onclick="unlock()">Enter Dashboard</button>
     <div style="text-align:center">
       <button class="btn btn-danger btn-sm" onclick="showSetup()" style="font-size:11px;padding:4px 10px;margin-top:4px">First time setup →</button>
+      <button class="btn btn-danger btn-sm" onclick="resetPassword()" style="font-size:11px;padding:4px 10px;margin-top:4px;margin-left:6px">Reset password</button>
     </div>
   </div>
 </div>
@@ -599,6 +600,13 @@ async function proxiedFetch(url) {
     } catch(e) { /* try next */ }
   }
   throw new Error('All proxies failed for: ' + url);
+}
+
+function resetPassword() {
+  if (confirm('This will clear the saved password and take you to setup. Continue?')) {
+    localStorage.removeItem('rb_dash_password');
+    showSetup();
+  }
 }
 
 // ── AUTH ──
@@ -867,6 +875,7 @@ function timeColor(date) {
 }
 
 
+function topicRowHTML(t) {
   const badgeClass = { reddit: 'badge-reddit', trends: 'badge-trends', rss: 'badge-rss', manual: 'badge-manual' }[t.source] || 'badge-manual';
   const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: 'RSS', manual: 'Custom' }[t.source] || 'Custom';
   const isSelected = t.listicle || t.article;
