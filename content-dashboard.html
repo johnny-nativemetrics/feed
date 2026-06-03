@@ -564,7 +564,23 @@ let allTopics = [];
 let activeFilter = 'all';
 let isGenerating = false;
 
-const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+// Multiple proxies to try in order
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
+];
+
+async function proxiedFetch(url) {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy + encodeURIComponent(url));
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text && text.length > 10) return text;
+    } catch(e) { /* try next */ }
+  }
+  throw new Error('All proxies failed for: ' + url);
+}
 
 // ── AUTH ──
 function unlock() {
@@ -683,15 +699,15 @@ async function fetchTopics() {
 
 async function fetchReddit(subreddit) {
   try {
-    const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=15`;
-    const proxied = CORS_PROXY + encodeURIComponent(url);
-    const res = await fetch(proxied);
-    const outer = await res.json();
-    const data = JSON.parse(outer.contents);
+    // Reddit's JSON API supports CORS directly — no proxy needed
+    const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=20&raw_json=1`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('Reddit returned ' + res.status);
+    const data = await res.json();
     const posts = data?.data?.children || [];
     posts.forEach(p => {
       const d = p.data;
-      if (d.stickied || d.score < 500) return;
+      if (d.stickied || d.score < 200 || d.is_self === false && !d.title) return;
       allTopics.push({
         id: 'r_' + d.id,
         title: d.title,
@@ -705,17 +721,15 @@ async function fetchReddit(subreddit) {
         status: null
       });
     });
-  } catch(e) { console.warn('Reddit fetch failed:', e); }
+  } catch(e) { console.warn('Reddit fetch failed:', subreddit, e); }
 }
 
 async function fetchTrends() {
   try {
     const url = 'https://trends.google.com/trending/rss?geo=US';
-    const proxied = CORS_PROXY + encodeURIComponent(url);
-    const res = await fetch(proxied);
-    const data = await res.json();
+    const text = await proxiedFetch(url);
     const parser = new DOMParser();
-    const xml = parser.parseFromString(data.contents, 'text/xml');
+    const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
     items.forEach(item => {
       const title = item.querySelector('title')?.textContent;
@@ -738,11 +752,9 @@ async function fetchTrends() {
 
 async function fetchRSS(feedUrl) {
   try {
-    const proxied = CORS_PROXY + encodeURIComponent(feedUrl);
-    const res = await fetch(proxied);
-    const data = await res.json();
+    const text = await proxiedFetch(feedUrl);
     const parser = new DOMParser();
-    const xml = parser.parseFromString(data.contents, 'text/xml');
+    const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
     items.forEach(item => {
       const title = item.querySelector('title')?.textContent;
