@@ -898,10 +898,10 @@ function topicRowHTML(t) {
       </div>
       <div class="topic-options">
         <div class="format-checks">
-          <label class="format-check ${t.listicle ? 'checked' : ''}" onclick="toggleFormat('${t.id}','listicle')">
+          <label class="format-check ${t.listicle ? 'checked' : ''}" onclick="event.preventDefault(); toggleFormat('${t.id}','listicle')">
             <input type="checkbox" ${t.listicle ? 'checked' : ''}> 📋 Listicle
           </label>
-          <label class="format-check ${t.article ? 'checked' : ''}" onclick="toggleFormat('${t.id}','article')">
+          <label class="format-check ${t.article ? 'checked' : ''}" onclick="event.preventDefault(); toggleFormat('${t.id}','article')">
             <input type="checkbox" ${t.article ? 'checked' : ''}> 📰 Article
           </label>
         </div>
