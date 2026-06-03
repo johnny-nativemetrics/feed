@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResourceBuzz Content Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #212126;
+    --border: #2e2e36;
+    --accent: #f0c040;
+    --accent2: #e8834a;
+    --text: #f0eff4;
+    --muted: #7a7a8a;
+    --success: #4caf7d;
+    --danger: #e05c5c;
+    --warn: #e8834a;
+    --radius: 10px;
+    --font-head: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── LOCK SCREEN ── */
+  #lock-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #lock-screen h1 {
+    font-family: var(--font-head);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  #lock-screen p { color: var(--muted); font-size: 13px; }
+  #lock-form {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 320px;
+    background: var(--surface);
+    padding: 28px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  #lock-error { color: var(--danger); font-size: 12px; display: none; }
+
+  /* ── SETTINGS MODAL ── */
+  #settings-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 900;
+  }
+  #settings-overlay.open { display: flex; }
+  #settings-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 560px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 32px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  #settings-modal h2 {
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .settings-section { display: flex; flex-direction: column; gap: 8px; }
+  .settings-section label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .settings-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── LAYOUT ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+  #app.visible { display: flex; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: var(--font-head);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.3px;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+
+  main { flex: 1; padding: 28px; max-width: 1100px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+  /* ── CUSTOM PROMPT BAR ── */
+  .prompt-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .prompt-bar-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 700;
+    white-space: nowrap;
+    padding-top: 10px;
+  }
+  .prompt-bar textarea {
+    flex: 1;
+    resize: none;
+    height: 40px;
+    line-height: 1.5;
+  }
+
+  /* ── CONTROLS BAR ── */
+  .controls-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .search-wrap {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+  }
+  .search-wrap input { padding-left: 34px; }
+  .search-icon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: 14px;
+  }
+  .source-filters { display: flex; gap: 6px; }
+  .filter-btn {
+    padding: 7px 13px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* ── TOPIC LIST ── */
+  .section-header {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section-title {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .topic-count { font-size: 12px; color: var(--muted); }
+
+  #topic-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .topic-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 14px;
+    transition: border-color 0.15s, background 0.15s;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .topic-row:hover { border-color: #3e3e4a; background: #1c1c21; }
+  .topic-row.selected { border-color: var(--accent); background: rgba(240,192,64,0.04); }
+  .topic-row.dismissed { display: none; }
+
+  .topic-select { padding-top: 2px; flex-shrink: 0; }
+
+  .topic-body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+  .topic-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .topic-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .source-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .badge-reddit { background: rgba(255,86,0,0.15); color: #ff7733; border: 1px solid rgba(255,86,0,0.2); }
+  .badge-trends { background: rgba(66,133,244,0.15); color: #7aadff; border: 1px solid rgba(66,133,244,0.2); }
+  .badge-rss { background: rgba(76,175,125,0.15); color: #6ed8a0; border: 1px solid rgba(76,175,125,0.2); }
+  .badge-manual { background: rgba(240,192,64,0.15); color: var(--accent); border: 1px solid rgba(240,192,64,0.2); }
+
+  .topic-options { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .format-checks { display: flex; gap: 8px; }
+  .format-check {
+    display: flex; align-items: center; gap: 5px;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .format-check input { display: none; }
+  .format-check.checked {
+    border-color: var(--accent);
+    background: rgba(240,192,64,0.1);
+    color: var(--text);
+  }
+  .format-check:hover { border-color: var(--accent); color: var(--text); }
+
+  .angle-input {
+    flex: 1;
+    min-width: 180px;
+    font-size: 12px;
+    padding: 6px 10px;
+    height: 32px;
+  }
+  .angle-input::placeholder { color: var(--muted); font-style: italic; }
+
+  .dismiss-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .dismiss-btn:hover { color: var(--danger); }
+
+  /* ── STATUS ── */
+  .topic-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .status-writing { background: rgba(232,131,74,0.15); color: var(--warn); }
+  .status-pushing { background: rgba(66,133,244,0.15); color: #7aadff; }
+  .status-done { background: rgba(76,175,125,0.15); color: var(--success); }
+  .status-error { background: rgba(224,92,92,0.15); color: var(--danger); }
+
+  /* ── EMPTY STATES ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .empty-state .icon { font-size: 36px; opacity: 0.4; }
+  .empty-state h3 { font-family: var(--font-head); font-size: 16px; color: var(--text); opacity: 0.5; }
+
+  /* ── BOTTOM BAR ── */
+  .bottom-bar {
+    position: sticky; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .selected-count { font-size: 13px; color: var(--muted); }
+  .selected-count strong { color: var(--text); }
+
+  /* ── INPUTS & BUTTONS ── */
+  input[type="text"], input[type="password"], textarea, select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    padding: 9px 12px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; }
+
+  select option { background: var(--surface2); }
+
+  .btn {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0f0f11;
+  }
+  .btn-primary:hover { background: #ffd04a; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(224,92,92,0.3);
+  }
+  .btn-danger:hover { background: rgba(224,92,92,0.1); }
+  .btn-sm { padding: 6px 13px; font-size: 12px; }
+
+  /* ── LOADING ── */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .refresh-btn {
+    font-size: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .refresh-btn.loading .refresh-icon { animation: spin 0.7s linear infinite; display: inline-block; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.toast-success { border-color: var(--success); color: var(--success); }
+  #toast.toast-error { border-color: var(--danger); color: var(--danger); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .divider { height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen">
+  <h1>ResourceBuzz</h1>
+  <p>Content Dashboard — Team Access Only</p>
+  <div id="lock-form">
+    <input type="password" id="lock-password" placeholder="Enter dashboard password" autocomplete="off">
+    <div id="lock-error">Incorrect password. Try again.</div>
+    <button class="btn btn-primary" onclick="unlock()">Enter Dashboard</button>
+    <div style="text-align:center">
+      <button class="btn btn-danger btn-sm" onclick="showSetup()" style="font-size:11px;padding:4px 10px;margin-top:4px">First time setup →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-overlay">
+  <div id="settings-modal">
+    <h2>⚙️ Dashboard Settings</h2>
+
+    <div class="settings-section">
+      <label>Dashboard Password</label>
+      <input type="password" id="s-password" placeholder="Set or change password">
+      <div class="settings-note">Used to gate access to this dashboard.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <label>OpenAI API Key</label>
+      <input type="password" id="s-openai" placeholder="sk-...">
+      <div id="s-openai-status" class="settings-note"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <label>WordPress Site URL</label>
+      <input type="text" id="s-wpurl" placeholder="https://resourcebuzz.com">
+    </div>
+    <div class="settings-section">
+      <label>WordPress Username</label>
+      <input type="text" id="s-wpuser" placeholder="content_bot">
+    </div>
+    <div class="settings-section">
+      <label>WordPress Application Password</label>
+      <input type="password" id="s-wppass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+      <div class="settings-note">Generate in WP Admin → Users → Application Passwords</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <label>Subreddits (one per line)</label>
+      <textarea id="s-subreddits" rows="4" placeholder="popular&#10;news&#10;technology&#10;personalfinance"></textarea>
+      <div class="settings-note">No r/ prefix needed. Start with popular and news.</div>
+    </div>
+
+    <div class="settings-section">
+      <label>RSS Feed URLs (one per line)</label>
+      <textarea id="s-rss" rows="4" placeholder="https://feeds.bbci.co.uk/news/rss.xml&#10;https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px">
+      <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header>
+    <div class="logo">ResourceBuzz <span>Content</span></div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm refresh-btn" id="refresh-btn" onclick="fetchTopics()">
+        <span class="refresh-icon">↻</span> Refresh Topics
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="openSettings()">⚙ Settings</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Custom Prompt Bar -->
+    <div class="prompt-bar">
+      <div class="prompt-bar-label">💡 Custom Topic</div>
+      <textarea id="custom-topic-input" placeholder="Paste a headline or describe a news story… e.g. 'Jeff Bezos rocket exploded on launch'" style="height:40px;flex:1"></textarea>
+      <button class="btn btn-secondary btn-sm" onclick="addCustomTopic()" style="flex-shrink:0;margin-top:4px">Add Topic</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Search topics…" oninput="filterTopics()">
+      </div>
+      <div class="source-filters">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" data-filter="reddit" onclick="setFilter('reddit', this)">Reddit</button>
+        <button class="filter-btn" data-filter="trends" onclick="setFilter('trends', this)">Trends</button>
+        <button class="filter-btn" data-filter="rss" onclick="setFilter('rss', this)">RSS</button>
+        <button class="filter-btn" data-filter="manual" onclick="setFilter('manual', this)">Manual</button>
+      </div>
+    </div>
+
+    <!-- Topic List -->
+    <div>
+      <div class="section-header" style="margin-bottom:12px">
+        <span class="section-title">Trending Topics</span>
+        <span class="topic-count" id="topic-count">0 topics</span>
+      </div>
+      <div id="topic-list">
+        <div class="empty-state">
+          <div class="icon">📡</div>
+          <h3>Loading topics…</h3>
+          <p>Fetching from Reddit, Google Trends, and RSS feeds</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="bottom-bar">
+    <div class="selected-count" id="selected-count">Select topics above to generate content</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary btn-sm" onclick="clearSelections()">Clear All</button>
+      <button class="btn btn-primary" id="generate-btn" onclick="generateSelected()" disabled>
+        ✦ Generate &amp; Push to WordPress
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CATEGORIES ──
+const WP_CATEGORIES = [
+  { id: 10, name: "Careers", keywords: ["job", "career", "work", "hire", "employment", "salary", "resume", "layoff"] },
+  { id: 41, name: "Entertainment", keywords: ["movie", "music", "celebrity", "tv", "show", "film", "actor", "award", "netflix", "streaming"] },
+  { id: 39, name: "Food & Drink", keywords: ["food", "recipe", "restaurant", "eat", "drink", "cooking", "diet", "nutrition"] },
+  { id: 31, name: "Lifestyle", keywords: ["lifestyle", "wellness", "home", "family", "relationship", "self", "mental", "health", "fitness"] },
+  { id: 35, name: "Nostalgia", keywords: ["retro", "classic", "vintage", "remember", "90s", "80s", "throwback", "history", "old"] },
+  { id: 34, name: "Travel", keywords: ["travel", "trip", "vacation", "flight", "hotel", "destination", "tourism"] },
+  { id: 8, name: "Budgeting", keywords: ["budget", "saving", "money", "cost", "expense", "frugal", "cheap"] },
+  { id: 9, name: "Finance News", keywords: ["stock", "market", "economy", "inflation", "fed", "interest rate", "crypto", "bank", "finance", "investment"] },
+  { id: 11, name: "Saving", keywords: ["save", "saving", "savings account", "invest", "401k", "retirement"] },
+  { id: 37, name: "Autos", keywords: ["car", "truck", "ev", "electric vehicle", "auto", "motor", "tesla", "ford", "toyota", "vehicle"] },
+  { id: 38, name: "Health & Wellness", keywords: ["health", "medical", "disease", "fitness", "exercise", "mental health", "drug", "hospital", "vaccine"] },
+  { id: 43, name: "Tech", keywords: ["tech", "ai", "software", "app", "robot", "space", "science", "startup", "gadget", "phone", "computer", "rocket"] },
+  { id: 32, name: "Trending", keywords: [] }, // fallback
+  { id: 1, name: "Uncategorized", keywords: [] }
+];
+
+// ── STATE ──
+let allTopics = [];
+let activeFilter = 'all';
+let isGenerating = false;
+
+const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+
+// ── AUTH ──
+function unlock() {
+  const pw = document.getElementById('lock-password').value;
+  const saved = localStorage.getItem('rb_dash_password');
+  if (!saved) { showSetup(); return; }
+  if (btoa(pw) === saved) {
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    setTimeout(fetchTopics, 300);
+  } else {
+    document.getElementById('lock-error').style.display = 'block';
+  }
+}
+
+function showSetup() {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  openSettings(true);
+}
+
+document.getElementById('lock-password').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+// Check if already set up
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('rb_dash_password');
+  if (!saved) { showSetup(); }
+});
+
+// ── SETTINGS ──
+function openSettings(isFirstRun = false) {
+  const s = document.getElementById('settings-overlay');
+  s.classList.add('open');
+  // Populate
+  document.getElementById('s-password').value = '';
+  const openaiKey = localStorage.getItem('rb_openai') || '';
+  document.getElementById('s-openai').value = openaiKey ? '●●●●●● (configured)' : '';
+  document.getElementById('s-openai-status').textContent = openaiKey ? '✓ Key is saved' : 'No key saved yet';
+  document.getElementById('s-openai-status').style.color = openaiKey ? 'var(--success)' : 'var(--warn)';
+  document.getElementById('s-wpurl').value = localStorage.getItem('rb_wp_url') || 'https://resourcebuzz.com';
+  document.getElementById('s-wpuser').value = localStorage.getItem('rb_wp_user') || '';
+  document.getElementById('s-wppass').value = localStorage.getItem('rb_wp_pass') ? '●●●●●● (configured)' : '';
+  document.getElementById('s-subreddits').value = localStorage.getItem('rb_subreddits') || 'popular\nnews';
+  document.getElementById('s-rss').value = localStorage.getItem('rb_rss') || 'https://feeds.bbci.co.uk/news/rss.xml\nhttps://rss.cnn.com/rss/edition.rss';
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+function saveSettings() {
+  const pw = document.getElementById('s-password').value;
+  if (pw) localStorage.setItem('rb_dash_password', btoa(pw));
+
+  const openai = document.getElementById('s-openai').value;
+  if (openai && !openai.startsWith('●')) localStorage.setItem('rb_openai', openai);
+
+  const wpurl = document.getElementById('s-wpurl').value.trim().replace(/\/$/, '');
+  if (wpurl) localStorage.setItem('rb_wp_url', wpurl);
+
+  const wpuser = document.getElementById('s-wpuser').value.trim();
+  if (wpuser) localStorage.setItem('rb_wp_user', wpuser);
+
+  const wppass = document.getElementById('s-wppass').value;
+  if (wppass && !wppass.startsWith('●')) localStorage.setItem('rb_wp_pass', wppass);
+
+  localStorage.setItem('rb_subreddits', document.getElementById('s-subreddits').value.trim());
+  localStorage.setItem('rb_rss', document.getElementById('s-rss').value.trim());
+
+  closeSettings();
+  showToast('Settings saved!', 'success');
+}
+
+// ── FETCH TOPICS ──
+async function fetchTopics() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const list = document.getElementById('topic-list');
+  list.innerHTML = `<div class="empty-state"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div><h3 style="margin-top:12px">Fetching topics…</h3></div>`;
+
+  allTopics = [];
+  const promises = [];
+
+  // Reddit
+  const subreddits = (localStorage.getItem('rb_subreddits') || 'popular\nnews').split('\n').filter(Boolean);
+  for (const sub of subreddits.slice(0, 3)) {
+    promises.push(fetchReddit(sub.trim()));
+  }
+
+  // Google Trends RSS
+  promises.push(fetchTrends());
+
+  // RSS Feeds
+  const rssFeeds = (localStorage.getItem('rb_rss') || '').split('\n').filter(Boolean);
+  for (const url of rssFeeds.slice(0, 4)) {
+    promises.push(fetchRSS(url.trim()));
+  }
+
+  await Promise.allSettled(promises);
+
+  // Dedupe by title similarity
+  const seen = new Set();
+  allTopics = allTopics.filter(t => {
+    const key = t.title.toLowerCase().replace(/[^a-z0-9 ]/g, '').substring(0, 40);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  renderTopics();
+  btn.classList.remove('loading');
+  btn.disabled = false;
+}
+
+async function fetchReddit(subreddit) {
+  try {
+    const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=15`;
+    const proxied = CORS_PROXY + encodeURIComponent(url);
+    const res = await fetch(proxied);
+    const outer = await res.json();
+    const data = JSON.parse(outer.contents);
+    const posts = data?.data?.children || [];
+    posts.forEach(p => {
+      const d = p.data;
+      if (d.stickied || d.score < 500) return;
+      allTopics.push({
+        id: 'r_' + d.id,
+        title: d.title,
+        source: 'reddit',
+        subreddit: d.subreddit,
+        score: d.score,
+        url: 'https://reddit.com' + d.permalink,
+        listicle: false,
+        article: false,
+        angle: '',
+        status: null
+      });
+    });
+  } catch(e) { console.warn('Reddit fetch failed:', e); }
+}
+
+async function fetchTrends() {
+  try {
+    const url = 'https://trends.google.com/trending/rss?geo=US';
+    const proxied = CORS_PROXY + encodeURIComponent(url);
+    const res = await fetch(proxied);
+    const data = await res.json();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(data.contents, 'text/xml');
+    const items = xml.querySelectorAll('item');
+    items.forEach(item => {
+      const title = item.querySelector('title')?.textContent;
+      const traffic = item.querySelector('approx_traffic')?.textContent || '';
+      if (!title) return;
+      allTopics.push({
+        id: 'gt_' + Math.random().toString(36).substr(2,9),
+        title: title,
+        source: 'trends',
+        meta: traffic ? traffic + ' searches' : '',
+        url: '',
+        listicle: false,
+        article: false,
+        angle: '',
+        status: null
+      });
+    });
+  } catch(e) { console.warn('Trends fetch failed:', e); }
+}
+
+async function fetchRSS(feedUrl) {
+  try {
+    const proxied = CORS_PROXY + encodeURIComponent(feedUrl);
+    const res = await fetch(proxied);
+    const data = await res.json();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(data.contents, 'text/xml');
+    const items = xml.querySelectorAll('item');
+    items.forEach(item => {
+      const title = item.querySelector('title')?.textContent;
+      const link = item.querySelector('link')?.textContent || '';
+      if (!title) return;
+      allTopics.push({
+        id: 'rss_' + Math.random().toString(36).substr(2,9),
+        title: title.replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
+        source: 'rss',
+        url: link,
+        listicle: false,
+        article: false,
+        angle: '',
+        status: null
+      });
+    });
+  } catch(e) { console.warn('RSS fetch failed:', feedUrl, e); }
+}
+
+// ── ADD CUSTOM TOPIC ──
+function addCustomTopic() {
+  const input = document.getElementById('custom-topic-input');
+  const val = input.value.trim();
+  if (!val) return;
+  allTopics.unshift({
+    id: 'manual_' + Date.now(),
+    title: val,
+    source: 'manual',
+    url: '',
+    listicle: false,
+    article: false,
+    angle: '',
+    status: null
+  });
+  input.value = '';
+  filterTopics();
+  showToast('Topic added!', 'success');
+}
+
+// ── RENDER ──
+function renderTopics() {
+  const list = document.getElementById('topic-list');
+  const search = document.getElementById('search-input').value.toLowerCase();
+  let filtered = allTopics.filter(t => {
+    if (t.dismissed) return false;
+    if (activeFilter !== 'all' && t.source !== activeFilter) return false;
+    if (search && !t.title.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById('topic-count').textContent = `${filtered.length} topic${filtered.length !== 1 ? 's' : ''}`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>No topics found</h3><p>Try a different search or refresh</p></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(t => topicRowHTML(t)).join('');
+  updateSelectedCount();
+}
+
+function topicRowHTML(t) {
+  const badgeClass = { reddit: 'badge-reddit', trends: 'badge-trends', rss: 'badge-rss', manual: 'badge-manual' }[t.source] || 'badge-manual';
+  const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: 'RSS', manual: 'Custom' }[t.source] || 'Custom';
+  const isSelected = t.listicle || t.article;
+  const statusHTML = t.status ? `<span class="topic-status status-${t.status.type}">${t.status.label}</span>` : '';
+
+  return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
+    <div class="topic-body">
+      <div class="topic-title-row">
+        <span class="topic-title">${escHtml(t.title)}</span>
+        <span class="source-badge ${badgeClass}">${badgeLabel}</span>
+        ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
+        ${statusHTML}
+        <button class="dismiss-btn" title="Dismiss" onclick="dismissTopic('${t.id}')">✕</button>
+      </div>
+      <div class="topic-options">
+        <div class="format-checks">
+          <label class="format-check ${t.listicle ? 'checked' : ''}" onclick="toggleFormat('${t.id}','listicle')">
+            <input type="checkbox" ${t.listicle ? 'checked' : ''}> 📋 Listicle
+          </label>
+          <label class="format-check ${t.article ? 'checked' : ''}" onclick="toggleFormat('${t.id}','article')">
+            <input type="checkbox" ${t.article ? 'checked' : ''}> 📰 Article
+          </label>
+        </div>
+        <input class="angle-input" type="text" placeholder="Custom angle (optional)… e.g. focus on other rockets that blew up similarly"
+          value="${escHtml(t.angle)}"
+          onchange="updateAngle('${t.id}', this.value)"
+          oninput="updateAngle('${t.id}', this.value)">
+      </div>
+    </div>
+  </div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INTERACTIONS ──
+function toggleFormat(id, type) {
+  const t = allTopics.find(x => x.id === id);
+  if (!t) return;
+  t[type] = !t[type];
+  const row = document.getElementById('row-' + id);
+  if (row) row.outerHTML = topicRowHTML(t);
+  updateSelectedCount();
+}
+
+function updateAngle(id, val) {
+  const t = allTopics.find(x => x.id === id);
+  if (t) t.angle = val;
+}
+
+function dismissTopic(id) {
+  const t = allTopics.find(x => x.id === id);
+  if (t) { t.dismissed = true; }
+  filterTopics();
+}
+
+function updateSelectedCount() {
+  const selected = allTopics.filter(t => (t.listicle || t.article) && !t.dismissed);
+  const totalJobs = selected.reduce((n, t) => n + (t.listicle ? 1 : 0) + (t.article ? 1 : 0), 0);
+  const el = document.getElementById('selected-count');
+  const btn = document.getElementById('generate-btn');
+  if (selected.length === 0) {
+    el.innerHTML = 'Select topics above to generate content';
+    btn.disabled = true;
+  } else {
+    el.innerHTML = `<strong>${selected.length}</strong> topic${selected.length !== 1 ? 's' : ''} selected → <strong>${totalJobs}</strong> article${totalJobs !== 1 ? 's' : ''} to generate`;
+    btn.disabled = isGenerating;
+  }
+}
+
+function clearSelections() {
+  allTopics.forEach(t => { t.listicle = false; t.article = false; t.angle = ''; });
+  filterTopics();
+}
+
+function filterTopics() { renderTopics(); }
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterTopics();
+}
+
+// ── GENERATION ──
+async function generateSelected() {
+  const openaiKey = localStorage.getItem('rb_openai');
+  const wpUrl = localStorage.getItem('rb_wp_url');
+  const wpUser = localStorage.getItem('rb_wp_user');
+  const wpPass = localStorage.getItem('rb_wp_pass');
+
+  if (!openaiKey) { showToast('OpenAI API key not set — check Settings', 'error'); return; }
+  if (!wpUrl || !wpUser || !wpPass) { showToast('WordPress credentials not set — check Settings', 'error'); return; }
+
+  const jobs = [];
+  allTopics.forEach(t => {
+    if (t.dismissed) return;
+    if (t.listicle) jobs.push({ topic: t, format: 'listicle' });
+    if (t.article) jobs.push({ topic: t, format: 'article' });
+  });
+
+  if (jobs.length === 0) return;
+
+  isGenerating = true;
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('generate-btn').textContent = '⏳ Generating…';
+
+  for (const job of jobs) {
+    await runJob(job, openaiKey, wpUrl, wpUser, wpPass);
+  }
+
+  isGenerating = false;
+  document.getElementById('generate-btn').disabled = false;
+  document.getElementById('generate-btn').innerHTML = '✦ Generate &amp; Push to WordPress';
+  showToast(`Done! ${jobs.length} article${jobs.length !== 1 ? 's' : ''} pushed to WordPress drafts.`, 'success');
+}
+
+async function runJob(job, openaiKey, wpUrl, wpUser, wpPass) {
+  const { topic, format } = job;
+
+  // Update status
+  setTopicStatus(topic.id, format, { type: 'writing', label: `✍ Writing ${format}…` });
+
+  try {
+    const content = await generateContent(topic, format, openaiKey);
+    setTopicStatus(topic.id, format, { type: 'pushing', label: '↑ Pushing to WP…' });
+
+    const categoryId = guessCategory(topic.title + ' ' + (topic.angle || ''));
+    await pushToWordPress(content, wpUrl, wpUser, wpPass, categoryId);
+
+    setTopicStatus(topic.id, format, { type: 'done', label: '✓ Published as draft' });
+  } catch(e) {
+    console.error(e);
+    setTopicStatus(topic.id, format, { type: 'error', label: '✗ Error — check console' });
+  }
+}
+
+function setTopicStatus(id, format, status) {
+  const t = allTopics.find(x => x.id === id);
+  if (t) {
+    t.status = status;
+    const row = document.getElementById('row-' + id);
+    if (row) row.outerHTML = topicRowHTML(t);
+  }
+}
+
+async function generateContent(topic, format, apiKey) {
+  const angleNote = topic.angle ? `\n\nIMPORTANT ANGLE DIRECTION: ${topic.angle}` : '';
+
+  const systemPrompt = format === 'listicle'
+    ? `You are a skilled content writer for ResourceBuzz.com, a general interest publication covering trending topics.
+Write engaging, scannable listicle articles. Format output as JSON with these exact fields:
+{
+  "title": "The article headline (compelling, SEO-friendly)",
+  "excerpt": "2-sentence meta description / excerpt",
+  "content": "Full HTML content of the listicle"
+}
+For content: Write 8-12 list items. Use <h2> for the main title area intro paragraph (1-2 sentences), then numbered items each with <h3> for the item headline and <p> for 2-3 sentences of supporting copy. For any claim you are not highly confident about, wrap it in: <mark data-verify="true">⚠️ [the claim]</mark> — this flags it for human fact-checking. Do NOT use markdown. Output ONLY valid JSON, no backticks.`
+    : `You are a skilled content writer for ResourceBuzz.com, a general interest publication covering trending topics.
+Write engaging, well-structured standard articles. Format output as JSON with these exact fields:
+{
+  "title": "The article headline (compelling, SEO-friendly)",
+  "excerpt": "2-sentence meta description / excerpt",
+  "content": "Full HTML content of the article"
+}
+For content: Write an intro paragraph in <p>, then 4-6 sections each with <h2> subheading and 2-3 <p> paragraphs. End with a brief conclusion under <h2>. For any claim you are not highly confident about, wrap it in: <mark data-verify="true">⚠️ [the claim]</mark> — this flags it for human fact-checking. Do NOT use markdown. Output ONLY valid JSON, no backticks.`;
+
+  const userPrompt = `Write a ${format === 'listicle' ? 'listicle' : 'standard article'} about this topic: "${topic.title}"${angleNote}
+
+Make it evergreen where possible. Be informative, engaging, and scannable. Aim for quality content that could stand alone without the original news hook.`;
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      max_tokens: 2500,
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error('OpenAI error: ' + (err.error?.message || res.status));
+  }
+
+  const data = await res.json();
+  const raw = data.choices[0].message.content.trim().replace(/^```json|```$/g, '').trim();
+  return JSON.parse(raw);
+}
+
+async function pushToWordPress(content, wpUrl, wpUser, wpPass, categoryId) {
+  const endpoint = `${wpUrl}/wp-json/wp/v2/posts`;
+  const auth = btoa(`${wpUser}:${wpPass}`);
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${auth}`
+    },
+    body: JSON.stringify({
+      title: content.title,
+      content: content.content,
+      excerpt: content.excerpt,
+      status: 'draft',
+      categories: [categoryId],
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error('WP error: ' + (err.message || res.status));
+  }
+
+  return await res.json();
+}
+
+function guessCategory(text) {
+  const lower = text.toLowerCase();
+  for (const cat of WP_CATEGORIES) {
+    if (cat.keywords.length === 0) continue;
+    if (cat.keywords.some(kw => lower.includes(kw))) return cat.id;
+  }
+  return 32; // Trending as fallback
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show toast-${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+</script>
+</body>
+</html>
