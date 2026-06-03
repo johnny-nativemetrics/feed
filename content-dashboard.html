@@ -266,7 +266,26 @@
   }
   .angle-input::placeholder { color: var(--muted); font-style: italic; }
 
-  .dismiss-btn {
+  .topic-title-link {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .topic-title-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .topic-time {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
     background: transparent;
     border: none;
     color: var(--muted);
@@ -692,6 +711,13 @@ async function fetchTopics() {
     return true;
   });
 
+  // Sort newest first
+  allTopics.sort((a, b) => {
+    if (!a.publishedAt) return 1;
+    if (!b.publishedAt) return -1;
+    return b.publishedAt - a.publishedAt;
+  });
+
   renderTopics();
   btn.classList.remove('loading');
   btn.disabled = false;
@@ -715,6 +741,7 @@ async function fetchReddit(subreddit) {
         subreddit: d.subreddit,
         score: d.score,
         url: 'https://reddit.com' + d.permalink,
+        publishedAt: d.created_utc ? new Date(d.created_utc * 1000) : null,
         listicle: false,
         article: false,
         angle: '',
@@ -741,6 +768,7 @@ async function fetchTrends() {
         source: 'trends',
         meta: traffic ? traffic + ' searches' : '',
         url: '',
+        publishedAt: new Date(), // Trends are always current
         listicle: false,
         article: false,
         angle: '',
@@ -760,11 +788,14 @@ async function fetchRSS(feedUrl) {
       const title = item.querySelector('title')?.textContent;
       const link = item.querySelector('link')?.textContent || '';
       if (!title) return;
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const parsedDate = pubDate ? new Date(pubDate) : null;
       allTopics.push({
         id: 'rss_' + Math.random().toString(36).substr(2,9),
         title: title.replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
         source: 'rss',
         url: link,
+        publishedAt: parsedDate && !isNaN(parsedDate) ? parsedDate : null,
         listicle: false,
         article: false,
         angle: '',
@@ -816,17 +847,42 @@ function renderTopics() {
   updateSelectedCount();
 }
 
-function topicRowHTML(t) {
+function relativeTime(date) {
+  if (!date) return '';
+  const diff = (Date.now() - date.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function timeColor(date) {
+  if (!date) return 'var(--muted)';
+  const hours = (Date.now() - date.getTime()) / 3600000;
+  if (hours < 6) return 'var(--success)';
+  if (hours < 24) return 'var(--accent)';
+  if (hours < 72) return 'var(--muted)';
+  return 'var(--danger)'; // old content — red flag
+}
+
+
   const badgeClass = { reddit: 'badge-reddit', trends: 'badge-trends', rss: 'badge-rss', manual: 'badge-manual' }[t.source] || 'badge-manual';
   const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: 'RSS', manual: 'Custom' }[t.source] || 'Custom';
   const isSelected = t.listicle || t.article;
   const statusHTML = t.status ? `<span class="topic-status status-${t.status.type}">${t.status.label}</span>` : '';
+  const timeStr = relativeTime(t.publishedAt);
+  const tColor = timeColor(t.publishedAt);
+  const titleHTML = t.url
+    ? `<a class="topic-title-link" href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.title)}</a>`
+    : `<span class="topic-title">${escHtml(t.title)}</span>`;
 
   return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
     <div class="topic-body">
       <div class="topic-title-row">
-        <span class="topic-title">${escHtml(t.title)}</span>
+        ${titleHTML}
         <span class="source-badge ${badgeClass}">${badgeLabel}</span>
+        ${timeStr ? `<span class="topic-time" style="color:${tColor}" title="${t.publishedAt ? t.publishedAt.toLocaleString() : ''}">${timeStr}</span>` : ''}
         ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
         ${statusHTML}
         <button class="dismiss-btn" title="Dismiss" onclick="dismissTopic('${t.id}')">✕</button>
