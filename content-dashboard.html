@@ -852,7 +852,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v3.4';
+const VERSION = 'v3.5';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -2243,6 +2243,7 @@ function startImport(input) {
 // ── GENERATION LOG ──
 const LOG_KEY = 'rb_generation_log';
 const LOG_MAX_DAYS = 60;
+const WP_LOG_CATEGORY = 45; // _Log category in ResourceBuzz
 let historyPeriodFilter = 'today';
 let historyStatusFilter = 'all';
 let currentPreviewEntry = null;
@@ -2263,22 +2264,156 @@ function logEntry(entry) {
   const log = getLog();
   log.unshift(entry);
   saveLog(log);
+  // Fire-and-forget WP log post — non-blocking
+  postLogToWP(entry).catch(e => console.warn('WP log post failed:', e));
 }
 
 function updateLogEntry(id, updates) {
   const log = getLog();
   const idx = log.findIndex(e => e.id === id);
-  if (idx !== -1) { log[idx] = { ...log[idx], ...updates }; saveLog(log); }
+  if (idx !== -1) {
+    log[idx] = { ...log[idx], ...updates };
+    saveLog(log);
+    // Update the WP log post if we have its ID
+    if (log[idx].wpLogPostId) {
+      updateLogInWP(log[idx]).catch(e => console.warn('WP log update failed:', e));
+    }
+  }
 }
 
 function createLogId() {
   return 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 }
 
+// ── WP LOG SYNC ──
+function buildLogPostContent(entry) {
+  // Store log data as a simple HTML table in the WP post body
+  // This makes it readable in WP admin and parseable if needed
+  return `<!-- rb-log-entry -->
+<table>
+<tr><th>ID</th><td>${entry.id}</td></tr>
+<tr><th>Timestamp</th><td>${entry.timestamp}</td></tr>
+<tr><th>Source Title</th><td>${entry.sourceTitle || ''}</td></tr>
+<tr><th>Source URL</th><td>${entry.sourceUrl || ''}</td></tr>
+<tr><th>Generated Title</th><td>${entry.generatedTitle || ''}</td></tr>
+<tr><th>Format</th><td>${entry.format || ''}</td></tr>
+<tr><th>Vertical</th><td>${entry.vertical || ''}</td></tr>
+<tr><th>Domain</th><td>${entry.domain || ''}</td></tr>
+<tr><th>WP Status</th><td>${entry.wpStatus || 'pending'}</td></tr>
+<tr><th>WP Post ID</th><td>${entry.wpPostId || ''}</td></tr>
+</table>`;
+}
+
+async function postLogToWP(entry) {
+  const wpUrl = localStorage.getItem('rb_wp_url');
+  const wpUser = localStorage.getItem('rb_wp_user');
+  const wpPass = localStorage.getItem('rb_wp_pass');
+  if (!wpUrl || !wpUser || !wpPass) return;
+
+  const auth = btoa(`${wpUser}:${wpPass}`);
+  const res = await fetch(`${wpUrl}/wp-json/wp/v2/posts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
+    body: JSON.stringify({
+      title: `[Log] ${entry.generatedTitle || entry.sourceTitle || entry.id}`,
+      content: buildLogPostContent(entry),
+      status: 'private',
+      categories: [WP_LOG_CATEGORY],
+      meta: { rb_log_id: entry.id }
+    })
+  });
+
+  if (!res.ok) return;
+  const data = await res.json();
+
+  // Store the WP post ID back into the log entry so we can update it later
+  const log = getLog();
+  const idx = log.findIndex(e => e.id === entry.id);
+  if (idx !== -1) {
+    log[idx].wpLogPostId = data.id;
+    saveLog(log);
+  }
+}
+
+async function updateLogInWP(entry) {
+  const wpUrl = localStorage.getItem('rb_wp_url');
+  const wpUser = localStorage.getItem('rb_wp_user');
+  const wpPass = localStorage.getItem('rb_wp_pass');
+  if (!wpUrl || !wpUser || !wpPass || !entry.wpLogPostId) return;
+
+  const auth = btoa(`${wpUser}:${wpPass}`);
+  await fetch(`${wpUrl}/wp-json/wp/v2/posts/${entry.wpLogPostId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
+    body: JSON.stringify({
+      title: `[Log] ${entry.generatedTitle || entry.sourceTitle || entry.id}`,
+      content: buildLogPostContent(entry),
+    })
+  });
+}
+
+// Load WP log entries into localStorage on history open (syncs across machines)
+async function syncLogFromWP() {
+  const wpUrl = localStorage.getItem('rb_wp_url');
+  const wpUser = localStorage.getItem('rb_wp_user');
+  const wpPass = localStorage.getItem('rb_wp_pass');
+  if (!wpUrl || !wpUser || !wpPass) return;
+
+  try {
+    const auth = btoa(`${wpUser}:${wpPass}`);
+    const res = await fetch(
+      `${wpUrl}/wp-json/wp/v2/posts?categories=${WP_LOG_CATEGORY}&status=private&per_page=100&orderby=date&order=desc`,
+      { headers: { 'Authorization': `Basic ${auth}` } }
+    );
+    if (!res.ok) return;
+    const posts = await res.json();
+
+    // Parse each WP log post back into a log entry object
+    const wpEntries = posts.map(post => {
+      const content = post.content?.rendered || '';
+      const extract = (field) => {
+        const match = content.match(new RegExp(`<th>${field}</th><td>(.*?)</td>`, 'i'));
+        return match ? match[1].replace(/<[^>]+>/g, '').trim() : '';
+      };
+      return {
+        id: extract('ID') || ('wp_' + post.id),
+        timestamp: extract('Timestamp') || post.date,
+        sourceTitle: extract('Source Title'),
+        sourceUrl: extract('Source URL'),
+        generatedTitle: extract('Generated Title'),
+        format: extract('Format'),
+        vertical: extract('Vertical'),
+        domain: extract('Domain'),
+        wpStatus: extract('WP Status') || 'success',
+        wpPostId: extract('WP Post ID') ? parseInt(extract('WP Post ID')) : null,
+        wpLogPostId: post.id,
+        // No generatedContent stored in WP to save space
+      };
+    });
+
+    // Merge WP entries with local log — WP is authoritative for old entries
+    const localLog = getLog();
+    const localIds = new Set(localLog.map(e => e.id));
+    const newFromWP = wpEntries.filter(e => !localIds.has(e.id));
+    if (newFromWP.length > 0) {
+      const merged = [...localLog, ...newFromWP].sort(
+        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+      );
+      saveLog(merged);
+    }
+  } catch(e) {
+    console.warn('WP log sync failed:', e);
+  }
+}
+
 // ── HISTORY UI ──
-function openHistory() {
+async function openHistory() {
   document.getElementById('history-overlay').style.display = 'flex';
-  renderHistory();
+  renderHistory(); // render local immediately
+  const summaryEl = document.getElementById('history-summary');
+  summaryEl.innerHTML += ' &nbsp;<span style="color:var(--muted);font-size:11px">↻ Syncing from WordPress…</span>';
+  await syncLogFromWP();
+  renderHistory(); // re-render with synced data
 }
 
 function closeHistory() {
