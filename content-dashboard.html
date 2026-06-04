@@ -594,7 +594,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v1.4';
+const VERSION = 'v1.5';
 
 // ── STATE ──
 let allTopics = [];
@@ -1212,7 +1212,7 @@ async function generateContent(topic, format, apiKey, sourceText, sourceFetched)
     : `\n\n⚠️ NOTE: No source article could be fetched. You MUST flag every specific factual claim with the ⚠️ verify marker since you are working from your training data only. Do not invent specific product names, dates, prices, or people.`;
 
   const systemPrompt = format === 'listicle'
-    ? `You are a content writer for ResourceBuzz.com. You write engaging listicle articles in WordPress block editor format.
+    ? `You are a content writer for ResourceBuzz.com. You write engaging, original listicle articles in WordPress block editor format.
 
 Output ONLY a JSON object with these exact fields — no backticks, no markdown, no preamble:
 {
@@ -1248,12 +1248,14 @@ FORMAT RULES FOR content — follow this exact structure:
 CRITICAL RULES:
 - Number items in DESCENDING order (15, 14, 13... or 10, 9, 8... down to 1)
 - Write 10-15 items depending on how much source material is available
-- Only include facts present in the source article
-- For any claim NOT in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
+- Only include facts present in the source article — do not invent facts not found there
+- For any claim NOT clearly in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
 - If no source was provided, mark EVERY specific factual claim
+- ORIGINALITY IS MANDATORY: Do NOT copy subheadings, sentences, or phrases from the source. Every H2 item title must be written in your own words — reframe the concept, don't transcribe the label. Every paragraph must be original prose, not paraphrase of the source sentence structure.
+- Think of the source as raw research material. Your job is to transform it into a fresh, readable article — same facts, entirely new expression.
 - No markdown, no extra HTML, no classes beyond what is shown above
 - Output ONLY valid JSON`
-    : `You are a content writer for ResourceBuzz.com. You write engaging standard articles in WordPress block editor format.
+    : `You are a content writer for ResourceBuzz.com. You write engaging, original standard articles in WordPress block editor format.
 
 Output ONLY a JSON object with these exact fields — no backticks, no markdown, no preamble:
 {
@@ -1279,9 +1281,11 @@ FORMAT RULES FOR content — use WordPress block format throughout:
 Structure: 2-3 intro paragraphs, then 4-6 H2 sections each with 2-3 paragraphs, then a brief conclusion section.
 
 CRITICAL RULES:
-- Only include facts present in the source article
-- For any claim NOT in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
+- Only include facts present in the source article — do not invent facts not found there
+- For any claim NOT clearly in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
 - If no source was provided, mark EVERY specific factual claim
+- ORIGINALITY IS MANDATORY: Do NOT copy headings, sentences, or phrases from the source. Every H2 and paragraph must be written in your own words. Reframe concepts, don't transcribe them.
+- Think of the source as raw research material. Your job is to transform it into a fresh, readable article — same facts, entirely new expression.
 - No markdown, no inline styles, no extra classes
 - Output ONLY valid JSON`;
 
