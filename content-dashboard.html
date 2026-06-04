@@ -497,9 +497,37 @@
       <button class="btn btn-secondary btn-sm" onclick="addFeedRow()" style="margin-top:8px">+ Add Feed</button>
     </div>
 
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <label>Backup &amp; Restore</label>
+      <div class="settings-note" style="margin-bottom:10px">Export encrypts your API keys and passwords with a passphrase. Share the file and passphrase separately.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="startExport()">⬇ Export Settings</button>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+          ⬆ Import Settings
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="startImport(this)">
+        </label>
+      </div>
+    </div>
+
     <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px">
       <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- PASSPHRASE OVERLAY -->
+<div id="passphrase-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:1100">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:400px;padding:28px;display:flex;flex-direction:column;gap:16px">
+    <h2 id="passphrase-title" style="font-family:var(--font-head);font-size:16px;font-weight:700"></h2>
+    <p id="passphrase-desc" style="font-size:13px;color:var(--muted);line-height:1.5"></p>
+    <input type="password" id="passphrase-input" placeholder="Enter passphrase…" autocomplete="off">
+    <div id="passphrase-error" style="font-size:12px;color:var(--danger);display:none"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closePassphraseOverlay()">Cancel</button>
+      <button class="btn btn-primary" id="passphrase-confirm-btn">Confirm</button>
     </div>
   </div>
 </div>
@@ -622,7 +650,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v1.9';
+const VERSION = 'v2.0';
 
 // ── STATE ──
 let allTopics = [];
@@ -1452,7 +1480,127 @@ function guessCategoryName(text) {
   return 'Trending';
 }
 
-// ── TOAST ──
+// ── CRYPTO ──
+async function deriveKey(passphrase, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(data, passphrase) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(passphrase, salt);
+  const enc = new TextEncoder();
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(data)));
+  return {
+    salt: btoa(String.fromCharCode(...salt)),
+    iv: btoa(String.fromCharCode(...iv)),
+    data: btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+  };
+}
+
+async function decryptData(payload, passphrase) {
+  const salt = Uint8Array.from(atob(payload.salt), c => c.charCodeAt(0));
+  const iv = Uint8Array.from(atob(payload.iv), c => c.charCodeAt(0));
+  const data = Uint8Array.from(atob(payload.data), c => c.charCodeAt(0));
+  const key = await deriveKey(passphrase, salt);
+  const dec = new TextDecoder();
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+  return JSON.parse(dec.decode(decrypted));
+}
+
+// ── PASSPHRASE OVERLAY ──
+function openPassphraseOverlay(title, desc, onConfirm) {
+  document.getElementById('passphrase-title').textContent = title;
+  document.getElementById('passphrase-desc').textContent = desc;
+  document.getElementById('passphrase-input').value = '';
+  document.getElementById('passphrase-error').style.display = 'none';
+  document.getElementById('passphrase-overlay').style.display = 'flex';
+  const btn = document.getElementById('passphrase-confirm-btn');
+  btn.onclick = async () => {
+    const pw = document.getElementById('passphrase-input').value;
+    if (!pw) { showPassphraseError('Please enter a passphrase.'); return; }
+    btn.disabled = true;
+    btn.textContent = 'Working…';
+    try {
+      await onConfirm(pw);
+      closePassphraseOverlay();
+    } catch(e) {
+      showPassphraseError('Incorrect passphrase or corrupted file.');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Confirm';
+  };
+  setTimeout(() => document.getElementById('passphrase-input').focus(), 100);
+}
+
+function showPassphraseError(msg) {
+  const el = document.getElementById('passphrase-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function closePassphraseOverlay() {
+  document.getElementById('passphrase-overlay').style.display = 'none';
+}
+
+// ── EXPORT ──
+function startExport() {
+  openPassphraseOverlay(
+    '⬇ Export Settings',
+    'Choose a passphrase to encrypt your API keys and passwords. You\'ll need this passphrase to import on another device. Keep it somewhere safe.',
+    async (passphrase) => {
+      const settings = {
+        rb_openai: localStorage.getItem('rb_openai') || '',
+        rb_wp_url: localStorage.getItem('rb_wp_url') || '',
+        rb_wp_user: localStorage.getItem('rb_wp_user') || '',
+        rb_wp_pass: localStorage.getItem('rb_wp_pass') || '',
+        rb_dash_password: localStorage.getItem('rb_dash_password') || '',
+        rb_rss_feeds: localStorage.getItem('rb_rss_feeds') || '[]',
+      };
+      const encrypted = await encryptData(settings, passphrase);
+      const blob = new Blob([JSON.stringify({ version: 1, ...encrypted }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `resourcebuzz-settings-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      showToast('Settings exported!', 'success');
+    }
+  );
+}
+
+// ── IMPORT ──
+function startImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let payload;
+    try { payload = JSON.parse(e.target.result); }
+    catch { showToast('Invalid file — not a valid settings export.', 'error'); return; }
+    openPassphraseOverlay(
+      '⬆ Import Settings',
+      'Enter the passphrase that was used when this file was exported.',
+      async (passphrase) => {
+        const settings = await decryptData(payload, passphrase);
+        Object.entries(settings).forEach(([k, v]) => { if (v) localStorage.setItem(k, v); });
+        showToast('Settings imported! Reloading…', 'success');
+        setTimeout(() => location.reload(), 1200);
+      }
+    );
+  };
+  reader.readAsText(file);
+  input.value = ''; // reset so same file can be re-imported
+}
+
+
 let toastTimer;
 function showToast(msg, type = 'success') {
   const el = document.getElementById('toast');
