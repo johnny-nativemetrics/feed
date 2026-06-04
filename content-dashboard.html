@@ -852,7 +852,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v3.2';
+const VERSION = 'v3.3';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -1738,25 +1738,28 @@ async function generateAngle(topicId, title, domain, vertical) {
 
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const systemPrompt = `You are a creative content strategist for ResourceBuzz.com. Your job is to suggest ONE unexpected, highly engaging content angle for a listicle or article.
+  const systemPrompt = `You are a content strategist for ResourceBuzz.com, a general interest publication. Your job is to suggest ONE specific, engaging content angle for a listicle or article based on a source headline.
 
 RULES:
-- Avoid the most obvious trending hooks: high protein, gut health, hustle culture, productivity hacks, AI will replace you, inflation, Gen Z vs Millennials
-- Find a surprising secondary angle — historical, counterintuitive, niche audience, or emotionally resonant
-- The angle should feel fresh and specific, not generic
-- Vary the item count suggestion: pick a number between 7 and 15 that feels natural (not always 10)
-- Output ONLY one sentence describing the angle, including the suggested item count. No preamble, no explanation.
-- Example outputs:
-  "10 reasons Depression-era cooks made better food than we do today — and what we lost along the way"
-  "8 surprisingly affordable cars that hold their value better than luxury brands"
-  "13 signs you were raised by emotionally unavailable parents (and how it still shows up at work)"`;
+- Stay relevant to the actual topic — don't go off into unrelated territory
+- Avoid the most generic, overused hooks: "high protein," "gut health," "hustle culture," "AI will replace you," "inflation," "10 ways to be more productive"
+- Look for a fresh but grounded angle: a specific audience, a useful comparison, a surprising context, or a counterintuitive finding within the topic
+- Include a specific item count between 7 and 15 — vary it, avoid defaulting to 10
+- Keep it practical and interesting to a general reader
+- Output ONLY one sentence. No quotes around it, no preamble, no explanation.
 
-  const userPrompt = `Today is ${today}.
-Article title: "${title}"
+Good examples:
+- Source: recipe article → "9 classic comfort food recipes that actually cost less to make than takeout"
+- Source: car review → "11 reliable used cars under $15k that mechanics actually recommend"  
+- Source: psychology article → "8 everyday habits that quietly signal high emotional intelligence"
+- Source: travel article → "7 U.S. national parks that are stunning in winter but rarely crowded"`;
+
+  const userPrompt = `Source headline: "${title}"
 Source domain: ${domain || 'unknown'}
 Content vertical: ${vertical || 'General'}
+Today's date: ${today}
 
-Suggest one unexpected, engaging angle with a specific item count.`;
+Suggest one specific, grounded, engaging angle with an item count.`;
 
   try {
     let angleText = '';
@@ -1776,7 +1779,7 @@ Suggest one unexpected, engaging angle with a specific item count.`;
         body: JSON.stringify({
           model: 'gpt-4o',
           max_tokens: 120,
-          temperature: 0.95,
+          temperature: 0.7,
           messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }]
         })
       });
