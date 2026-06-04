@@ -576,12 +576,6 @@
       <button class="filter-btn active" data-domain="all" onclick="toggleDomainFilter('all', this)">All</button>
     </div>
 
-    <!-- Category Pills -->
-    <div id="cat-pills-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0">Category:</span>
-      <button class="filter-btn active" data-cat="all" onclick="toggleCatFilter('all', this)">All</button>
-    </div>
-
     <!-- Topic List -->
     <div>
       <div class="section-header" style="margin-bottom:12px">
@@ -628,12 +622,11 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v1.7';
+const VERSION = 'v1.9';
 
 // ── STATE ──
 let allTopics = [];
-let activeDomains = new Set(['all']); // multi-select domain filter
-let activeCategories = new Set(['all']); // multi-select category filter
+let activeDomains = new Set(['all']);
 let isGenerating = false;
 
 const FETCH_SERVER = 'https://tools.nativemetrics-svc.com/fetch-article?url=';
@@ -720,7 +713,6 @@ function openSettings(isFirstRun = false) {
   document.getElementById('s-wpurl').value = localStorage.getItem('rb_wp_url') || 'https://resourcebuzz.com';
   document.getElementById('s-wpuser').value = localStorage.getItem('rb_wp_user') || '';
   document.getElementById('s-wppass').value = localStorage.getItem('rb_wp_pass') ? '●●●●●● (configured)' : '';
-  document.getElementById('s-subreddits').value = localStorage.getItem('rb_subreddits') || 'popular\nnews';
   // Build feed manager
   const saved = JSON.parse(localStorage.getItem('rb_rss_feeds') || '[]');
   const feeds = saved.length ? saved : [
@@ -885,36 +877,6 @@ function buildDomainPills() {
   bar.innerHTML = `<span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0">Sources:</span>
     <button class="filter-btn ${activeDomains.has('all') ? 'active' : ''}" data-domain="all" onclick="toggleDomainFilter('all', this)">All</button>
     ${domains.map(d => `<button class="filter-btn ${activeDomains.has(d) ? 'active' : ''}" data-domain="${d}" onclick="toggleDomainFilter('${d}', this)">${d}</button>`).join('')}`;
-
-  // Category pills — only show categories that actually have topics
-  const cats = [...new Set(allTopics.filter(t => t.category).map(t => t.category))].sort();
-  const catBar = document.getElementById('cat-pills-bar');
-  catBar.innerHTML = `<span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0">Category:</span>
-    <button class="filter-btn ${activeCategories.has('all') ? 'active' : ''}" data-cat="all" onclick="toggleCatFilter('all', this)">All</button>
-    ${cats.map(c => `<button class="filter-btn ${activeCategories.has(c) ? 'active' : ''}" data-cat="${escHtml(c)}" onclick="toggleCatFilter('${escHtml(c)}', this)">${escHtml(c)}</button>`).join('')}`;
-}
-
-function toggleCatFilter(cat, btn) {
-  if (cat === 'all') {
-    activeCategories = new Set(['all']);
-    document.querySelectorAll('#cat-pills-bar .filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  } else {
-    activeCategories.delete('all');
-    document.querySelector('#cat-pills-bar [data-cat="all"]')?.classList.remove('active');
-    if (activeCategories.has(cat)) {
-      activeCategories.delete(cat);
-      btn.classList.remove('active');
-      if (activeCategories.size === 0) {
-        activeCategories.add('all');
-        document.querySelector('#cat-pills-bar [data-cat="all"]')?.classList.add('active');
-      }
-    } else {
-      activeCategories.add(cat);
-      btn.classList.add('active');
-    }
-  }
-  filterTopics();
 }
 
 function toggleDomainFilter(domain, btn) {
@@ -987,7 +949,6 @@ function renderTopics() {
       if (t.source === 'manual') return false;
       if (!activeDomains.has(t.domain)) return false;
     }
-    if (!activeCategories.has('all') && !activeCategories.has(t.category)) return false;
     if (search && !t.title.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1034,14 +995,11 @@ function topicRowHTML(t) {
     ? `<a class="topic-title-link" href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.title)}</a>`
     : `<span class="topic-title">${escHtml(t.title)}</span>`;
 
-  const catTag = t.category ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--muted);border:1px solid var(--border)">${escHtml(t.category)}</span>` : '';
-
   return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
     <div class="topic-body">
       <div class="topic-title-row">
         ${titleHTML}
         <span class="source-badge ${badgeClass}">${badgeLabel}</span>
-        ${catTag}
         ${timeStr ? `<span class="topic-time" style="color:${tColor}" title="${t.publishedAt ? t.publishedAt.toLocaleString() : ''}">${timeStr}</span>` : ''}
         ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
         ${statusHTML}
@@ -1285,7 +1243,7 @@ async function runJob(job, openaiKey, wpUrl, wpUser, wpPass) {
     const content = await generateContent(topic, format, openaiKey, sourceText, sourceFetched);
     setTopicStatus(topic.id, format, { type: 'pushing', label: '↑ Pushing to WP…' });
 
-    const categoryId = guessCategory(topic.title + ' ' + (topic.angle || ''));
+    const categoryId = guessCategory((sourceText || '') + ' ' + topic.title + ' ' + (topic.angle || ''));
     await pushToWordPress(content, wpUrl, wpUser, wpPass, categoryId);
 
     setTopicStatus(topic.id, format, { type: 'done', label: '✓ Published as draft' });
