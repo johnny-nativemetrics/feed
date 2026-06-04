@@ -420,6 +420,19 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+  .feed-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .feed-row input { flex: 1; font-size: 12px; padding: 7px 10px; }
+  .feed-status {
+    font-size: 11px; font-weight: 600;
+    white-space: nowrap; min-width: 60px; text-align: center;
+  }
+  .feed-status.ok { color: var(--success); }
+  .feed-status.fail { color: var(--danger); }
+  .feed-status.testing { color: var(--warn); }
+
   .divider { height: 1px; background: var(--border); }
 </style>
 </head>
@@ -484,8 +497,10 @@
     </div>
 
     <div class="settings-section">
-      <label>RSS Feed URLs (one per line)</label>
-      <textarea id="s-rss" rows="4" placeholder="https://feeds.bbci.co.uk/news/rss.xml&#10;https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"></textarea>
+      <label>RSS Feed URLs</label>
+      <div class="settings-note" style="margin-bottom:8px">Add one feed per row. Use the Test button to verify before saving.</div>
+      <div id="rss-feed-manager"></div>
+      <button class="btn btn-secondary btn-sm" onclick="addFeedRow()" style="margin-top:8px">+ Add Feed</button>
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:8px">
@@ -584,22 +599,23 @@ let allTopics = [];
 let activeFilter = 'all';
 let isGenerating = false;
 
-// Multiple proxies to try in order
-const CORS_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.codetabs.com/v1/proxy?quest=',
-];
+const FETCH_SERVER = 'https://tools.nativemetrics-svc.com/fetch-article?url=';
 
 async function proxiedFetch(url) {
-  for (const proxy of CORS_PROXIES) {
-    try {
-      const res = await fetch(proxy + encodeURIComponent(url));
-      if (!res.ok) continue;
-      const text = await res.text();
-      if (text && text.length > 10) return text;
-    } catch(e) { /* try next */ }
-  }
-  throw new Error('All proxies failed for: ' + url);
+  const res = await fetch(FETCH_SERVER + encodeURIComponent(url));
+  if (!res.ok) throw new Error('Fetch server error: ' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error('blocked');
+  // Return raw text for RSS/Trends XML parsing compatibility
+  return data.text || data.contents || '';
+}
+
+async function fetchArticleForGeneration(url) {
+  const res = await fetch(FETCH_SERVER + encodeURIComponent(url));
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data.error) return null;
+  return data; // { title, text, publishedAt }
 }
 
 function resetPassword() {
@@ -641,7 +657,6 @@ window.addEventListener('load', () => {
 function openSettings(isFirstRun = false) {
   const s = document.getElementById('settings-overlay');
   s.classList.add('open');
-  // Populate
   document.getElementById('s-password').value = '';
   const openaiKey = localStorage.getItem('rb_openai') || '';
   document.getElementById('s-openai').value = openaiKey ? '●●●●●● (configured)' : '';
@@ -651,7 +666,87 @@ function openSettings(isFirstRun = false) {
   document.getElementById('s-wpuser').value = localStorage.getItem('rb_wp_user') || '';
   document.getElementById('s-wppass').value = localStorage.getItem('rb_wp_pass') ? '●●●●●● (configured)' : '';
   document.getElementById('s-subreddits').value = localStorage.getItem('rb_subreddits') || 'popular\nnews';
-  document.getElementById('s-rss').value = localStorage.getItem('rb_rss') || 'https://feeds.bbci.co.uk/news/rss.xml\nhttps://rss.cnn.com/rss/edition.rss';
+  // Build feed manager
+  const saved = JSON.parse(localStorage.getItem('rb_rss_feeds') || '[]');
+  const feeds = saved.length ? saved : [
+    'https://mentalfloss.com/rss.xml',
+    'https://www.rd.com/feed/',
+    'https://www.psychologytoday.com/us/front/feed',
+    'https://www.popularmechanics.com/rss/all.xml',
+    'https://www.caranddriver.com/rss/all.xml',
+    'https://www.investopedia.com/feedburner.xml',
+    'https://www.healthline.com/rss/news',
+    'https://www.tasteofhome.com/feed/',
+  ];
+  renderFeedManager(feeds);
+}
+
+function renderFeedManager(feeds) {
+  const mgr = document.getElementById('rss-feed-manager');
+  mgr.innerHTML = feeds.map((url, i) => feedRowHTML(url, i)).join('');
+}
+
+function feedRowHTML(url, i) {
+  return `<div class="feed-row" id="feed-row-${i}">
+    <input type="text" value="${escHtml(url)}" id="feed-url-${i}" placeholder="https://example.com/rss" oninput="updateFeedRow(${i})">
+    <button class="btn btn-secondary btn-sm" onclick="testFeed(${i})">Test</button>
+    <span class="feed-status" id="feed-status-${i}"></span>
+    <button class="dismiss-btn" onclick="removeFeedRow(${i})" title="Remove">✕</button>
+  </div>`;
+}
+
+function addFeedRow() {
+  const mgr = document.getElementById('rss-feed-manager');
+  const rows = mgr.querySelectorAll('.feed-row');
+  const i = rows.length;
+  const div = document.createElement('div');
+  div.innerHTML = feedRowHTML('', i);
+  mgr.appendChild(div.firstElementChild);
+}
+
+function removeFeedRow(i) {
+  const row = document.getElementById('feed-row-' + i);
+  if (row) row.remove();
+  // Re-index remaining rows
+  const mgr = document.getElementById('rss-feed-manager');
+  mgr.querySelectorAll('.feed-row').forEach((row, newIdx) => {
+    row.id = 'feed-row-' + newIdx;
+    const input = row.querySelector('input');
+    if (input) input.id = 'feed-url-' + newIdx;
+    const status = row.querySelector('.feed-status');
+    if (status) status.id = 'feed-status-' + newIdx;
+    const testBtn = row.querySelector('.btn-secondary');
+    if (testBtn) testBtn.setAttribute('onclick', `testFeed(${newIdx})`);
+    const removeBtn = row.querySelector('.dismiss-btn');
+    if (removeBtn) removeBtn.setAttribute('onclick', `removeFeedRow(${newIdx})`);
+  });
+}
+
+function updateFeedRow(i) { /* value read on save */ }
+
+async function testFeed(i) {
+  const input = document.getElementById('feed-url-' + i);
+  const status = document.getElementById('feed-status-' + i);
+  const url = input?.value.trim();
+  if (!url) return;
+  status.textContent = 'Testing…';
+  status.className = 'feed-status testing';
+  try {
+    const text = await proxiedFetch(url);
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+    const items = xml.querySelectorAll('item');
+    if (items.length > 0) {
+      status.textContent = `✓ ${items.length} items`;
+      status.className = 'feed-status ok';
+    } else {
+      status.textContent = '✗ No items';
+      status.className = 'feed-status fail';
+    }
+  } catch(e) {
+    status.textContent = '✗ Failed';
+    status.className = 'feed-status fail';
+  }
 }
 
 function closeSettings() {
@@ -675,7 +770,14 @@ function saveSettings() {
   if (wppass && !wppass.startsWith('●')) localStorage.setItem('rb_wp_pass', wppass);
 
   localStorage.setItem('rb_subreddits', document.getElementById('s-subreddits').value.trim());
-  localStorage.setItem('rb_rss', document.getElementById('s-rss').value.trim());
+
+  // Save RSS feeds from manager
+  const feeds = [];
+  document.querySelectorAll('#rss-feed-manager .feed-row input').forEach(input => {
+    const val = input.value.trim();
+    if (val) feeds.push(val);
+  });
+  localStorage.setItem('rb_rss_feeds', JSON.stringify(feeds));
 
   closeSettings();
   showToast('Settings saved!', 'success');
@@ -703,7 +805,7 @@ async function fetchTopics() {
   promises.push(fetchTrends());
 
   // RSS Feeds
-  const rssFeeds = (localStorage.getItem('rb_rss') || '').split('\n').filter(Boolean);
+  const rssFeeds = JSON.parse(localStorage.getItem('rb_rss_feeds') || '[]');
   for (const url of rssFeeds.slice(0, 4)) {
     promises.push(fetchRSS(url.trim()));
   }
@@ -788,6 +890,7 @@ async function fetchTrends() {
 
 async function fetchRSS(feedUrl) {
   try {
+    const domain = extractDomain(feedUrl);
     const text = await proxiedFetch(feedUrl);
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
@@ -802,6 +905,7 @@ async function fetchRSS(feedUrl) {
         id: 'rss_' + Math.random().toString(36).substr(2,9),
         title: title.replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
         source: 'rss',
+        domain: domain,
         url: link,
         publishedAt: parsedDate && !isNaN(parsedDate) ? parsedDate : null,
         listicle: false,
@@ -811,6 +915,11 @@ async function fetchRSS(feedUrl) {
       });
     });
   } catch(e) { console.warn('RSS fetch failed:', feedUrl, e); }
+}
+
+function extractDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); }
+  catch(e) { return 'RSS'; }
 }
 
 // ── ADD CUSTOM TOPIC ──
@@ -877,7 +986,7 @@ function timeColor(date) {
 
 function topicRowHTML(t) {
   const badgeClass = { reddit: 'badge-reddit', trends: 'badge-trends', rss: 'badge-rss', manual: 'badge-manual' }[t.source] || 'badge-manual';
-  const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: 'RSS', manual: 'Custom' }[t.source] || 'Custom';
+  const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: t.domain || 'RSS', manual: 'Custom' }[t.source] || 'Custom';
   const isSelected = t.listicle || t.article;
   const statusHTML = t.status ? `<span class="topic-status status-${t.status.type}">${t.status.label}</span>` : '';
   const timeStr = relativeTime(t.publishedAt);
@@ -1002,11 +1111,27 @@ async function generateSelected() {
 async function runJob(job, openaiKey, wpUrl, wpUser, wpPass) {
   const { topic, format } = job;
 
-  // Update status
+  setTopicStatus(topic.id, format, { type: 'writing', label: `📥 Fetching source…` });
+
+  // Try to fetch the source article text first
+  let sourceText = null;
+  let sourceFetched = false;
+  if (topic.url) {
+    try {
+      const article = await fetchArticleForGeneration(topic.url);
+      if (article && article.text && article.text.length > 200) {
+        sourceText = article.text;
+        sourceFetched = true;
+      }
+    } catch(e) {
+      console.warn('Could not fetch source article:', e);
+    }
+  }
+
   setTopicStatus(topic.id, format, { type: 'writing', label: `✍ Writing ${format}…` });
 
   try {
-    const content = await generateContent(topic, format, openaiKey);
+    const content = await generateContent(topic, format, openaiKey, sourceText, sourceFetched);
     setTopicStatus(topic.id, format, { type: 'pushing', label: '↑ Pushing to WP…' });
 
     const categoryId = guessCategory(topic.title + ' ' + (topic.angle || ''));
@@ -1019,6 +1144,37 @@ async function runJob(job, openaiKey, wpUrl, wpUser, wpPass) {
   }
 }
 
+function extractArticleText(html) {
+  // Parse the HTML and extract readable text from article/main content areas
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Remove noise elements
+  ['script','style','nav','header','footer','aside','form',
+   '.ad','.advertisement','.sidebar','.related','[class*="cookie"]',
+   '[class*="newsletter"]','[class*="subscribe"]'].forEach(sel => {
+    doc.querySelectorAll(sel).forEach(el => el.remove());
+  });
+
+  // Try to find the main article content
+  const candidates = [
+    doc.querySelector('article'),
+    doc.querySelector('[role="main"]'),
+    doc.querySelector('main'),
+    doc.querySelector('.article-body'),
+    doc.querySelector('.post-content'),
+    doc.querySelector('.entry-content'),
+    doc.querySelector('.story-body'),
+    doc.querySelector('#article-body'),
+    doc.body
+  ].filter(Boolean);
+
+  const el = candidates[0];
+  const text = el.innerText || el.textContent || '';
+  // Trim to ~6000 chars to stay within token limits
+  return text.replace(/\s+/g, ' ').trim().substring(0, 6000);
+}
+
 function setTopicStatus(id, format, status) {
   const t = allTopics.find(x => x.id === id);
   if (t) {
@@ -1028,30 +1184,88 @@ function setTopicStatus(id, format, status) {
   }
 }
 
-async function generateContent(topic, format, apiKey) {
-  const angleNote = topic.angle ? `\n\nIMPORTANT ANGLE DIRECTION: ${topic.angle}` : '';
+async function generateContent(topic, format, apiKey, sourceText, sourceFetched) {
+  const angleNote = topic.angle ? `\n\nANGLE DIRECTION: ${topic.angle}` : '';
+
+  const sourceBlock = sourceFetched
+    ? `\n\nSOURCE ARTICLE TEXT (use this as your primary factual basis — do not invent facts not present here):\n"""\n${sourceText}\n"""`
+    : `\n\n⚠️ NOTE: No source article could be fetched. You MUST flag every specific factual claim with the ⚠️ verify marker since you are working from your training data only. Do not invent specific product names, dates, prices, or people.`;
 
   const systemPrompt = format === 'listicle'
-    ? `You are a skilled content writer for ResourceBuzz.com, a general interest publication covering trending topics.
-Write engaging, scannable listicle articles. Format output as JSON with these exact fields:
-{
-  "title": "The article headline (compelling, SEO-friendly)",
-  "excerpt": "2-sentence meta description / excerpt",
-  "content": "Full HTML content of the listicle"
-}
-For content: Write 8-12 list items. Use <h2> for the main title area intro paragraph (1-2 sentences), then numbered items each with <h3> for the item headline and <p> for 2-3 sentences of supporting copy. For any claim you are not highly confident about, wrap it in: <mark data-verify="true">⚠️ [the claim]</mark> — this flags it for human fact-checking. Do NOT use markdown. Output ONLY valid JSON, no backticks.`
-    : `You are a skilled content writer for ResourceBuzz.com, a general interest publication covering trending topics.
-Write engaging, well-structured standard articles. Format output as JSON with these exact fields:
-{
-  "title": "The article headline (compelling, SEO-friendly)",
-  "excerpt": "2-sentence meta description / excerpt",
-  "content": "Full HTML content of the article"
-}
-For content: Write an intro paragraph in <p>, then 4-6 sections each with <h2> subheading and 2-3 <p> paragraphs. End with a brief conclusion under <h2>. For any claim you are not highly confident about, wrap it in: <mark data-verify="true">⚠️ [the claim]</mark> — this flags it for human fact-checking. Do NOT use markdown. Output ONLY valid JSON, no backticks.`;
+    ? `You are a content writer for ResourceBuzz.com. You write engaging listicle articles in WordPress block editor format.
 
-  const userPrompt = `Write a ${format === 'listicle' ? 'listicle' : 'standard article'} about this topic: "${topic.title}"${angleNote}
+Output ONLY a JSON object with these exact fields — no backticks, no markdown, no preamble:
+{
+  "title": "SEO-friendly listicle headline with a number e.g. '15 Things That Defined Gen X Childhood'",
+  "excerpt": "2-sentence meta description",
+  "content": "Full WordPress block HTML"
+}
 
-Make it evergreen where possible. Be informative, engaging, and scannable. Aim for quality content that could stand alone without the original news hook.`;
+FORMAT RULES FOR content — follow this exact structure:
+
+1. Start with 2-3 intro paragraphs in WP paragraph blocks:
+<!-- wp:paragraph -->
+<p>Intro text here.</p>
+<!-- /wp:paragraph -->
+
+2. End the intro with a transition sentence like "Here are [N] things that..."
+
+3. Then for EACH list item, repeat this exact block pattern in order — heading, then image, then exactly 2 paragraphs:
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">[NUMBER]. [Item Title]</h2>
+<!-- /wp:heading -->
+<!-- wp:image {"sizeSlug":"full","linkDestination":"none"} -->
+<figure class="wp-block-image size-full"><img src="https://via.placeholder.com/800x500" alt="[Item Title]" /><figcaption class="wp-element-caption">Image needed</figcaption></figure>
+<!-- /wp:image -->
+<!-- wp:paragraph -->
+<p>[First paragraph — hook sentence, 1-2 sentences.]</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>[Second paragraph — more detail, 2-3 sentences.]</p>
+<!-- /wp:paragraph -->
+
+CRITICAL RULES:
+- Number items in DESCENDING order (15, 14, 13... or 10, 9, 8... down to 1)
+- Write 10-15 items depending on how much source material is available
+- Only include facts present in the source article
+- For any claim NOT in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
+- If no source was provided, mark EVERY specific factual claim
+- No markdown, no extra HTML, no classes beyond what is shown above
+- Output ONLY valid JSON`
+    : `You are a content writer for ResourceBuzz.com. You write engaging standard articles in WordPress block editor format.
+
+Output ONLY a JSON object with these exact fields — no backticks, no markdown, no preamble:
+{
+  "title": "SEO-friendly article headline",
+  "excerpt": "2-sentence meta description",
+  "content": "Full WordPress block HTML"
+}
+
+FORMAT RULES FOR content — use WordPress block format throughout:
+
+<!-- wp:paragraph -->
+<p>Intro paragraph text.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Section Heading</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Body paragraph text.</p>
+<!-- /wp:paragraph -->
+
+Structure: 2-3 intro paragraphs, then 4-6 H2 sections each with 2-3 paragraphs, then a brief conclusion section.
+
+CRITICAL RULES:
+- Only include facts present in the source article
+- For any claim NOT in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
+- If no source was provided, mark EVERY specific factual claim
+- No markdown, no inline styles, no extra classes
+- Output ONLY valid JSON`;
+
+  const userPrompt = `Write a ${format === 'listicle' ? 'listicle' : 'standard article'} inspired by this topic: "${topic.title}"${angleNote}${sourceBlock}`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -1061,8 +1275,8 @@ Make it evergreen where possible. Be informative, engaging, and scannable. Aim f
     },
     body: JSON.stringify({
       model: 'gpt-4o',
-      max_tokens: 2500,
-      temperature: 0.7,
+      max_tokens: 3500,
+      temperature: 0.5,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
