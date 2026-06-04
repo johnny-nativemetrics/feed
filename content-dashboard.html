@@ -10,29 +10,49 @@
     --bg: #0f0f11;
     --surface: #18181c;
     --surface2: #212126;
+    --surface3: #2a2a30;
     --border: #2e2e36;
     --accent: #f0c040;
-    --accent2: #e8834a;
+    --accent-dim: rgba(240,192,64,0.12);
+    --accent-border: rgba(240,192,64,0.3);
     --text: #f0eff4;
-    --muted: #7a7a8a;
+    --text-secondary: #b0afba;
+    --muted: #6a6a7a;
     --success: #4caf7d;
+    --success-dim: rgba(76,175,125,0.12);
     --danger: #e05c5c;
+    --danger-dim: rgba(224,92,92,0.12);
     --warn: #e8834a;
+    --warn-dim: rgba(232,131,74,0.12);
+    --blue: #7aadff;
+    --blue-dim: rgba(122,173,255,0.12);
     --radius: 10px;
     --font-head: 'Syne', sans-serif;
     --font-body: 'DM Sans', sans-serif;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
 
   body.light-mode {
-    --bg: #f4f4f6;
+    --bg: #f0f0f5;
     --surface: #ffffff;
-    --surface2: #ebebef;
-    --border: #d8d8e0;
-    --text: #18181c;
-    --muted: #7a7a8a;
-    --success: #2e8f5e;
-    --danger: #c0392b;
-    --warn: #c0641a;
+    --surface2: #f4f4f8;
+    --surface3: #eaeaf0;
+    --border: #dcdce8;
+    --accent: #c49a00;
+    --accent-dim: rgba(196,154,0,0.08);
+    --accent-border: rgba(196,154,0,0.25);
+    --text: #1a1a24;
+    --text-secondary: #4a4a5a;
+    --muted: #8a8a9a;
+    --success: #1a7a4a;
+    --success-dim: rgba(26,122,74,0.08);
+    --danger: #b03030;
+    --danger-dim: rgba(176,48,48,0.08);
+    --warn: #a05010;
+    --warn-dim: rgba(160,80,16,0.08);
+    --blue: #2060c0;
+    --blue-dim: rgba(32,96,192,0.08);
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
 
   .theme-toggle {
@@ -133,6 +153,7 @@
     height: 56px;
     display: flex; align-items: center; justify-content: space-between;
     position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--shadow);
   }
   .logo {
     font-family: var(--font-head);
@@ -197,11 +218,12 @@
     transition: all 0.15s;
   }
   .filter-btn.active {
-    background: var(--surface2);
-    color: var(--text);
-    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent-border);
+    font-weight: 600;
   }
-  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ── TOPIC LIST ── */
   .section-header {
@@ -230,8 +252,8 @@
   }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-  .topic-row:hover { border-color: #3e3e4a; background: #1c1c21; }
-  .topic-row.selected { border-color: var(--accent); background: rgba(240,192,64,0.04); }
+  .topic-row:hover { border-color: var(--surface3); background: var(--surface2); }
+  .topic-row.selected { border-color: var(--accent); background: var(--accent-dim); }
   .topic-row.dismissed { display: none; }
 
   .topic-select { padding-top: 2px; flex-shrink: 0; }
@@ -256,10 +278,10 @@
     border-radius: 4px;
     flex-shrink: 0;
   }
-  .badge-reddit { background: rgba(255,86,0,0.15); color: #ff7733; border: 1px solid rgba(255,86,0,0.2); }
-  .badge-trends { background: rgba(66,133,244,0.15); color: #7aadff; border: 1px solid rgba(66,133,244,0.2); }
-  .badge-rss { background: rgba(76,175,125,0.15); color: #6ed8a0; border: 1px solid rgba(76,175,125,0.2); }
-  .badge-manual { background: rgba(240,192,64,0.15); color: var(--accent); border: 1px solid rgba(240,192,64,0.2); }
+  .badge-reddit { background: rgba(255,86,0,0.12); color: #ff7733; border: 1px solid rgba(255,86,0,0.2); }
+  .badge-trends { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(122,173,255,0.2); }
+  .badge-rss { background: var(--success-dim); color: var(--success); border: 1px solid rgba(76,175,125,0.2); }
+  .badge-manual { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); }
 
   .topic-options { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -281,10 +303,11 @@
   .format-check input { display: none; }
   .format-check.checked {
     border-color: var(--accent);
-    background: rgba(240,192,64,0.1);
-    color: var(--text);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
   }
-  .format-check:hover { border-color: var(--accent); color: var(--text); }
+  .format-check:hover { border-color: var(--accent); color: var(--accent); }
 
   .angle-input {
     flex: 1;
@@ -335,10 +358,10 @@
     border-radius: 4px;
     font-weight: 600;
   }
-  .status-writing { background: rgba(232,131,74,0.15); color: var(--warn); }
-  .status-pushing { background: rgba(66,133,244,0.15); color: #7aadff; }
-  .status-done { background: rgba(76,175,125,0.15); color: var(--success); }
-  .status-error { background: rgba(224,92,92,0.15); color: var(--danger); }
+  .status-writing { background: var(--warn-dim); color: var(--warn); }
+  .status-pushing { background: var(--blue-dim); color: var(--blue); }
+  .status-done { background: var(--success-dim); color: var(--success); }
+  .status-error { background: var(--danger-dim); color: var(--danger); }
 
   /* ── EMPTY STATES ── */
   .empty-state {
@@ -357,6 +380,7 @@
     border-top: 1px solid var(--border);
     padding: 14px 28px;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
   }
   .selected-count { font-size: 13px; color: var(--muted); }
   .selected-count strong { color: var(--text); }
@@ -495,7 +519,7 @@
 
     <div class="divider"></div>
 
-    <div class="settings-section">
+    <div class="settings-section" id="openai-settings-section">
       <label>OpenAI API Key</label>
       <input type="password" id="s-openai" placeholder="sk-...">
       <div id="s-openai-status" class="settings-note"></div>
@@ -577,7 +601,7 @@
 
     <div class="settings-section">
       <label>Topic / Description</label>
-      <textarea id="manual-text" rows="6" placeholder="Paste article text, a headline, or write a detailed description of what you want the article to cover. The more detail the better.&#10;&#10;E.g. 'Jeff Bezos rocket exploded on launch — make a listicle about other famous rockets that have exploded similarly, focusing on historical incidents from the Space Race onward.'"></textarea>
+      <textarea id="manual-text" rows="6" placeholder="Paste article text, a headline, or write a detailed description of what you want the article to cover. The more detail the better.&#10;&#10;For expansion: e.g. 'This is a 5-point article — expand to 10 slides by splitting each point into 2 separate items with distinct angles.'&#10;For angle: e.g. 'Jeff Bezos rocket exploded — make a listicle about other famous rockets that have exploded, focusing on Space Race incidents.'"></textarea>
     </div>
 
     <div class="settings-section">
@@ -688,7 +712,49 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v2.2';
+const VERSION = 'v2.5';
+
+/*
+  ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
+  This file auto-detects its environment via IS_HOSTED (hostname check).
+  On GitHub Pages: uses client-side password gate + localStorage OpenAI key.
+  On tools.nativemetrics-svc.com: expects session auth + /api/generate endpoint.
+
+  REQUIRED EXPRESS ENDPOINTS:
+
+  GET /
+    Serve this HTML file. Redirect to /login if no valid session.
+
+  GET /login
+    Serve a simple login form (username + password POST to /login).
+
+  POST /login
+    Validate credentials against .env DASHBOARD_USER / DASHBOARD_PASS (bcrypt).
+    On success: set signed session cookie, redirect to /.
+    On failure: re-render login with error.
+
+  GET /logout
+    Destroy session, redirect to /login.
+
+  POST /api/generate
+    Body: { systemPrompt: string, userPrompt: string }
+    Auth: reject with 401 if no valid session.
+    Action: call OpenAI chat completions API with the provided prompts.
+    OpenAI params: model=gpt-4o, max_tokens=3500, temperature=0.5
+    Return: the raw OpenAI response JSON as-is.
+    Error: return { error: "openai_error", message: "..." } with 502 on failure.
+
+  GET /fetch-article?url= (ALREADY EXISTS — no changes needed)
+
+  ENV VARS NEEDED:
+    SESSION_SECRET=
+    DASHBOARD_USER=jenny
+    DASHBOARD_PASS=         # bcrypt hash of password
+    OPENAI_API_KEY=
+
+  PACKAGES: express, express-session, bcrypt, node-fetch (or axios)
+  ────────────────────────────────────────────────────────────────────────────
+*/
 
 // ── THEME ──
 function toggleTheme() {
@@ -786,8 +852,17 @@ document.getElementById('lock-password').addEventListener('keydown', e => { if (
 window.addEventListener('load', () => {
   applyTheme();
   document.getElementById('version-badge').textContent = VERSION;
-  const saved = localStorage.getItem('rb_dash_password');
-  if (!saved) { showSetup(); }
+  if (IS_HOSTED) {
+    // On the permanent server, auth is handled by session cookie via /login
+    // Hide the lock screen and show the app directly
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    setTimeout(fetchTopics, 300);
+  } else {
+    // GitHub Pages: use client-side password gate
+    const saved = localStorage.getItem('rb_dash_password');
+    if (!saved) { showSetup(); }
+  }
 });
 
 // ── SETTINGS ──
@@ -796,9 +871,15 @@ function openSettings(isFirstRun = false) {
   s.classList.add('open');
   document.getElementById('s-password').value = '';
   const openaiKey = localStorage.getItem('rb_openai') || '';
-  document.getElementById('s-openai').value = openaiKey ? '●●●●●● (configured)' : '';
-  document.getElementById('s-openai-status').textContent = openaiKey ? '✓ Key is saved' : 'No key saved yet';
-  document.getElementById('s-openai-status').style.color = openaiKey ? 'var(--success)' : 'var(--warn)';
+  const openaiSection = document.getElementById('openai-settings-section');
+  if (IS_HOSTED) {
+    if (openaiSection) openaiSection.style.display = 'none';
+  } else {
+    if (openaiSection) openaiSection.style.display = '';
+    document.getElementById('s-openai').value = openaiKey ? '●●●●●● (configured)' : '';
+    document.getElementById('s-openai-status').textContent = openaiKey ? '✓ Key is saved' : 'No key saved yet';
+    document.getElementById('s-openai-status').style.color = openaiKey ? 'var(--success)' : 'var(--warn)';
+  }
   document.getElementById('s-wpurl').value = localStorage.getItem('rb_wp_url') || 'https://resourcebuzz.com';
   document.getElementById('s-wpuser').value = localStorage.getItem('rb_wp_user') || '';
   document.getElementById('s-wppass').value = localStorage.getItem('rb_wp_pass') ? '●●●●●● (configured)' : '';
@@ -1136,7 +1217,7 @@ function topicRowHTML(t) {
     : `<span class="topic-title">${escHtml(t.title)}</span>`;
 
   const verticalTag = t.vertical && t.vertical !== 'General'
-    ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(240,192,64,0.08);color:var(--accent);border:1px solid rgba(240,192,64,0.2)">${escHtml(t.vertical)}</span>`
+    ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-border)">${escHtml(t.vertical)}</span>`
     : '';
 
   return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
@@ -1159,7 +1240,7 @@ function topicRowHTML(t) {
             <input type="checkbox" ${t.article ? 'checked' : ''}> 📰 Article
           </label>
         </div>
-        <input class="angle-input" type="text" placeholder="Custom angle (optional)… e.g. focus on other rockets that blew up similarly"
+        <input class="angle-input" type="text" placeholder="Custom angle (optional)… e.g. 'focus on budget options under $20k' or 'expand to 10 slides — split each point into 2 separate items'"
           value="${escHtml(t.angle)}"
           onchange="updateAngle('${t.id}', this.value)"
           oninput="updateAngle('${t.id}', this.value)">
@@ -1336,7 +1417,7 @@ async function generateSelected() {
   const wpUser = localStorage.getItem('rb_wp_user');
   const wpPass = localStorage.getItem('rb_wp_pass');
 
-  if (!openaiKey) { showToast('OpenAI API key not set — check Settings', 'error'); return; }
+  if (!IS_HOSTED && !openaiKey) { showToast('OpenAI API key not set — check Settings', 'error'); return; }
   if (!wpUrl || !wpUser || !wpPass) { showToast('WordPress credentials not set — check Settings', 'error'); return; }
 
   const jobs = [];
@@ -1360,6 +1441,10 @@ async function generateSelected() {
   document.getElementById('generate-btn').disabled = false;
   document.getElementById('generate-btn').innerHTML = '✦ Generate &amp; Push to WordPress';
   showToast(`Done! ${jobs.length} article${jobs.length !== 1 ? 's' : ''} pushed to WordPress drafts.`, 'success');
+  // Reset selections after generation so count clears
+  allTopics.forEach(t => { t.listicle = false; t.article = false; t.angle = ''; });
+  updateSelectedCount();
+  filterTopics();
 }
 
 async function runJob(job, openaiKey, wpUrl, wpUser, wpPass) {
@@ -1438,12 +1523,15 @@ function setTopicStatus(id, format, status) {
   }
 }
 
+// Detect if running on the permanent server or GitHub Pages
+const IS_HOSTED = window.location.hostname === 'tools.nativemetrics-svc.com';
+
 async function generateContent(topic, format, apiKey, sourceText, sourceFetched) {
   const angleNote = topic.angle ? `\n\nANGLE DIRECTION: ${topic.angle}` : '';
 
   const sourceBlock = sourceFetched
     ? `\n\nSOURCE ARTICLE TEXT (use this as your primary factual basis — do not invent facts not present here):\n"""\n${sourceText}\n"""`
-    : `\n\n⚠️ NOTE: No source article could be fetched. You MUST flag every specific factual claim with the ⚠️ verify marker since you are working from your training data only. Do not invent specific product names, dates, prices, or people.`;
+    : `\n\n⚠️ SOURCE UNAVAILABLE: The source article could not be fetched. Begin your response content with this exact WP block before anything else:\n<!-- wp:paragraph -->\n<p><strong>⚠️ Editor note: No source article was available for this draft. All facts should be verified before publishing.</strong></p>\n<!-- /wp:paragraph -->\n\nThen write the article using only well-established, commonly known facts. Do not invent specific statistics, quotes, or claims.`;
 
   const systemPrompt = format === 'listicle'
     ? `You are a content writer for ResourceBuzz.com. You write engaging, original listicle articles in WordPress block editor format.
@@ -1481,10 +1569,10 @@ FORMAT RULES FOR content — follow this exact structure:
 
 CRITICAL RULES:
 - Number items in DESCENDING order (15, 14, 13... or 10, 9, 8... down to 1)
-- Write 10-15 items depending on how much source material is available
+- Default to 10-15 items depending on source material — BUT if the angle direction specifies a target number of items (e.g. "expand to 10", "make it 12 slides"), that number takes priority and overrides the default
+- If the angle asks to expand existing items (e.g. "split each into 2"), create that many distinct H2 items — do not combine them
 - Only include facts present in the source article — do not invent facts not found there
-- For any claim NOT clearly in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
-- If no source was provided, mark EVERY specific factual claim
+- Do NOT use any ⚠️ flags or highlight markers in the output — editors will verify as needed
 - ORIGINALITY IS MANDATORY: Do NOT copy subheadings, sentences, or phrases from the source. Every H2 item title must be written in your own words — reframe the concept, don't transcribe the label. Every paragraph must be original prose, not paraphrase of the source sentence structure.
 - Think of the source as raw research material. Your job is to transform it into a fresh, readable article — same facts, entirely new expression.
 - No markdown, no extra HTML, no classes beyond what is shown above
@@ -1516,8 +1604,7 @@ Structure: 2-3 intro paragraphs, then 4-6 H2 sections each with 2-3 paragraphs, 
 
 CRITICAL RULES:
 - Only include facts present in the source article — do not invent facts not found there
-- For any claim NOT clearly in the source, wrap it: <mark data-verify="true">⚠️ [claim]</mark>
-- If no source was provided, mark EVERY specific factual claim
+- Do NOT use any ⚠️ flags or highlight markers in the output — editors will verify as needed
 - ORIGINALITY IS MANDATORY: Do NOT copy headings, sentences, or phrases from the source. Every H2 and paragraph must be written in your own words. Reframe concepts, don't transcribe them.
 - Think of the source as raw research material. Your job is to transform it into a fresh, readable article — same facts, entirely new expression.
 - No markdown, no inline styles, no extra classes
@@ -1525,29 +1612,47 @@ CRITICAL RULES:
 
   const userPrompt = `Write a ${format === 'listicle' ? 'listicle' : 'standard article'} inspired by this topic: "${topic.title}"${angleNote}${sourceBlock}`;
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 3500,
-      temperature: 0.5,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ]
-    })
-  });
+  let data;
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error('OpenAI error: ' + (err.error?.message || res.status));
+  if (IS_HOSTED) {
+    // ── SERVER MODE: call /api/generate, OpenAI key stays server-side ──
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, userPrompt })
+    });
+    if (res.status === 401) throw new Error('Session expired — please log in again.');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error('Server error: ' + (err.message || res.status));
+    }
+    data = await res.json();
+  } else {
+    // ── GITHUB PAGES MODE: call OpenAI directly with localStorage key ──
+    if (!apiKey) throw new Error('OpenAI API key not set — check Settings');
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 3500,
+        temperature: 0.5,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error('OpenAI error: ' + (err.error?.message || res.status));
+    }
+    data = await res.json();
   }
 
-  const data = await res.json();
   const raw = data.choices[0].message.content.trim().replace(/^```json|```$/g, '').trim();
   return JSON.parse(raw);
 }
