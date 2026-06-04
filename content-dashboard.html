@@ -850,7 +850,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v2.9';
+const VERSION = 'v3.0';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -1498,10 +1498,11 @@ function topicRowHTML(t) {
             <input type="checkbox" ${t.article ? 'checked' : ''}> 📰 Article
           </label>
         </div>
-        <input class="angle-input" type="text" placeholder="Custom angle (optional)… e.g. 'focus on budget options under $20k' or 'expand to 10 slides — split each point into 2 separate items'"
+        <input class="angle-input" id="angle-input-${t.id}" type="text" placeholder="Custom angle (optional)… e.g. 'focus on budget options under $20k' or 'expand to 10 slides — split each point into 2 separate items'"
           value="${escHtml(t.angle)}"
           onchange="updateAngle('${t.id}', this.value)"
           oninput="updateAngle('${t.id}', this.value)">
+        <button class="btn btn-secondary btn-sm" id="angle-btn-${t.id}" style="flex-shrink:0;font-size:11px;padding:5px 10px;white-space:nowrap" onclick="generateAngle('${t.id}', ${JSON.stringify(t.title)}, ${JSON.stringify(t.domain||'')}, ${JSON.stringify(t.vertical||'')})">✨ Angle</button>
       </div>
     </div>
   </div>`;
@@ -1684,7 +1685,79 @@ async function generateManual() {
   }
 }
 
-// ── GENERATION ──
+// ── GENERATE ANGLE ──
+async function generateAngle(topicId, title, domain, vertical) {
+  const apiKey = localStorage.getItem('rb_openai');
+  if (!IS_HOSTED && !apiKey) { showToast('OpenAI API key not set — check Settings', 'error'); return; }
+
+  const btn = document.getElementById('angle-btn-' + topicId);
+  const input = document.getElementById('angle-input-' + topicId);
+  if (!btn || !input) return;
+
+  btn.textContent = '⏳';
+  btn.disabled = true;
+
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const systemPrompt = `You are a creative content strategist for ResourceBuzz.com. Your job is to suggest ONE unexpected, highly engaging content angle for a listicle or article.
+
+RULES:
+- Avoid the most obvious trending hooks: high protein, gut health, hustle culture, productivity hacks, AI will replace you, inflation, Gen Z vs Millennials
+- Find a surprising secondary angle — historical, counterintuitive, niche audience, or emotionally resonant
+- The angle should feel fresh and specific, not generic
+- Vary the item count suggestion: pick a number between 7 and 15 that feels natural (not always 10)
+- Output ONLY one sentence describing the angle, including the suggested item count. No preamble, no explanation.
+- Example outputs:
+  "10 reasons Depression-era cooks made better food than we do today — and what we lost along the way"
+  "8 surprisingly affordable cars that hold their value better than luxury brands"
+  "13 signs you were raised by emotionally unavailable parents (and how it still shows up at work)"`;
+
+  const userPrompt = `Today is ${today}.
+Article title: "${title}"
+Source domain: ${domain || 'unknown'}
+Content vertical: ${vertical || 'General'}
+
+Suggest one unexpected, engaging angle with a specific item count.`;
+
+  try {
+    let angleText = '';
+    if (IS_HOSTED) {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemPrompt, userPrompt })
+      });
+      if (!res.ok) throw new Error('Server error');
+      const data = await res.json();
+      angleText = data.choices[0].message.content.trim();
+    } else {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 120,
+          temperature: 0.95,
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }]
+        })
+      });
+      if (!res.ok) throw new Error('OpenAI error');
+      const data = await res.json();
+      angleText = data.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+    }
+
+    input.value = angleText;
+    updateAngle(topicId, angleText);
+    showToast('✨ Angle generated!', 'success');
+  } catch(e) {
+    showToast('Angle generation failed — try again', 'error');
+  }
+
+  btn.textContent = '✨ Angle';
+  btn.disabled = false;
+}
+
+
 async function generateSelected() {
   const openaiKey = localStorage.getItem('rb_openai');
   const wpUrl = localStorage.getItem('rb_wp_url');
@@ -1870,8 +1943,8 @@ FORMAT RULES FOR content — follow this exact structure:
 
 CRITICAL RULES:
 - Number items in DESCENDING order (15, 14, 13... or 10, 9, 8... down to 1)
-- Default to 10-15 items depending on source material — BUT if the angle direction specifies a target number of items (e.g. "expand to 10", "make it 12 slides"), that number takes priority and overrides the default
-- If the angle asks to expand existing items (e.g. "split each into 2"), create that many distinct H2 items — do not combine them
+- Item count: if the angle direction specifies a number (e.g. "expand to 10", "make it 12 slides", "8 reasons"), use exactly that number. Otherwise choose a count between 7 and 15 that feels natural for the content — vary it, do NOT default to 10 every time. Odd numbers (7, 9, 11, 13) and numbers like 8 or 12 feel fresher than always landing on 10.
+- You do NOT need to use every point from the source — leave some out, reframe others, add broader context where it enriches the piece. The goal is an original take, not a transcript.
 - Only include facts present in the source article — do not invent facts not found there
 - Do NOT use any ⚠️ flags or highlight markers in the output — editors will verify as needed
 - ORIGINALITY IS MANDATORY: Do NOT copy subheadings, sentences, or phrases from the source. Every H2 item title must be written in your own words — reframe the concept, don't transcribe the label. Every paragraph must be original prose, not paraphrase of the source sentence structure.
@@ -2330,8 +2403,9 @@ function downloadHTMLReport() {
     </tr>`;
   }).join('');
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ResourceBuzz Content Report — ${periodLabel}</title>
-<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;color:#1a1a24}h1{font-size:22px;font-weight:800;color:#c49a00;margin-bottom:4px}.meta{font-size:13px;color:#8a8a9a;margin-bottom:24px}.summary{display:flex;gap:24px;margin-bottom:24px}.stat{background:#f4f4f8;border-radius:8px;padding:12px 20px}.stat-value{font-size:24px;font-weight:800}.stat-label{font-size:11px;color:#8a8a9a;text-transform:uppercase;letter-spacing:.08em}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:8px 12px;background:#f4f4f8;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8a8a9a;border-bottom:2px solid #dcdce8}td{padding:10px 12px;border-bottom:1px solid #dcdce8;vertical-align:top}tr:hover td{background:#f9f9fc}a{color:#c49a00}</style>
+<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;color:#1a1a24}h1{font-size:22px;font-weight:800;color:#c49a00;margin-bottom:4px}.meta{font-size:13px;color:#8a8a9a;margin-bottom:24px}.summary{display:flex;gap:24px;margin-bottom:24px}.stat{background:#f4f4f8;border-radius:8px;padding:12px 20px}.stat-value{font-size:24px;font-weight:800}.stat-label{font-size:11px;color:#8a8a9a;text-transform:uppercase;letter-spacing:.08em}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:8px 12px;background:#f4f4f8;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8a8a9a;border-bottom:2px solid #dcdce8}td{padding:10px 12px;border-bottom:1px solid #dcdce8;vertical-align:top}tr:hover td{background:#f9f9fc}a{color:#c49a00}.print-btn{position:fixed;top:20px;right:20px;background:#c49a00;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}@media print{.print-btn{display:none}}</style>
 </head><body>
+<button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
 <h1>ResourceBuzz Content Report</h1>
 <div class="meta">Period: ${periodLabel} &nbsp;·&nbsp; Generated: ${new Date().toLocaleString()}</div>
 <div class="summary">
@@ -2342,12 +2416,9 @@ function downloadHTMLReport() {
 <table><thead><tr><th>Date/Time</th><th>Source</th><th>Generated Title</th><th>Format</th><th>Vertical</th><th>Status</th></tr></thead>
 <tbody>${rows}</tbody></table>
 </body></html>`;
+  // Open in new tab for snapshotting/printing instead of downloading
   const blob = new Blob([html],{type:'text/html'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `resourcebuzz-report-${new Date().toISOString().slice(0,10)}.html`;
-  a.click();
-  showToast('HTML report downloaded!', 'success');
+  window.open(URL.createObjectURL(blob), '_blank');
 }
 
 let toastTimer;
