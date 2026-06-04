@@ -598,9 +598,15 @@
       <button class="btn btn-primary btn-sm" onclick="openManualOverlay()" style="flex-shrink:0">✏️ Manual Topic</button>
     </div>
 
+    <!-- Site Vertical Pills -->
+    <div id="vertical-pills-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0;min-width:90px">Site Vertical:</span>
+      <button class="filter-btn active" data-vertical="all" onclick="toggleVerticalFilter('all',this)">All</button>
+    </div>
+
     <!-- RSS Source Pills -->
     <div id="rss-pills-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0">Sources:</span>
+      <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0;min-width:90px">Sources:</span>
       <button class="filter-btn active" data-domain="all" onclick="toggleDomainFilter('all', this)">All</button>
     </div>
 
@@ -650,11 +656,14 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v2.0';
+const VERSION = 'v2.1';
+
+const VERTICALS = ['General','Autos','Entertainment','Fashion','Finance','Food','Health','History','Lifestyle','Pets','Science','Sports','Tech','Travel'];
 
 // ── STATE ──
 let allTopics = [];
 let activeDomains = new Set(['all']);
+let activeVerticals = new Set(['all']);
 let isGenerating = false;
 
 const FETCH_SERVER = 'https://tools.nativemetrics-svc.com/fetch-article?url=';
@@ -743,27 +752,36 @@ function openSettings(isFirstRun = false) {
   document.getElementById('s-wppass').value = localStorage.getItem('rb_wp_pass') ? '●●●●●● (configured)' : '';
   // Build feed manager
   const saved = JSON.parse(localStorage.getItem('rb_rss_feeds') || '[]');
-  const feeds = saved.length ? saved : [
-    'https://mentalfloss.com/rss.xml',
-    'https://www.rd.com/feed/',
-    'https://www.psychologytoday.com/us/front/feed',
-    'https://www.popularmechanics.com/rss/all.xml',
-    'https://www.caranddriver.com/rss/all.xml',
-    'https://www.investopedia.com/feedburner.xml',
-    'https://www.healthline.com/rss/news',
-    'https://www.tasteofhome.com/feed/',
+  // Migrate old string format to object format
+  const normalized = saved.map(f => typeof f === 'string' ? { url: f, vertical: 'General' } : f);
+  const feeds = normalized.length ? normalized : [
+    { url: 'https://www.psychologytoday.com/us/front/feed', vertical: 'Health' },
+    { url: 'https://mentalfloss.com/rss.xml', vertical: 'General' },
+    { url: 'https://allthatsinteresting.com/feed', vertical: 'General' },
+    { url: 'https://www.nerdwallet.com/blog/feed/', vertical: 'Finance' },
+    { url: 'https://feeds.marketwatch.com/marketwatch/topstories', vertical: 'Finance' },
+    { url: 'https://www.caranddriver.com/rss/all.xml', vertical: 'Autos' },
+    { url: 'https://www.popularmechanics.com/rss/all.xml', vertical: 'Science' },
+    { url: 'https://www.sciencedaily.com/rss/all.xml', vertical: 'Science' },
+    { url: 'https://arstechnica.com/feed/', vertical: 'Tech' },
+    { url: 'https://www.tasteofhome.com/feed/', vertical: 'Food' },
+    { url: 'https://screenrant.com/feed/', vertical: 'Entertainment' },
   ];
   renderFeedManager(feeds);
 }
 
 function renderFeedManager(feeds) {
   const mgr = document.getElementById('rss-feed-manager');
-  mgr.innerHTML = feeds.map((url, i) => feedRowHTML(url, i)).join('');
+  mgr.innerHTML = feeds.map((f, i) => feedRowHTML(f, i)).join('');
 }
 
-function feedRowHTML(url, i) {
+function feedRowHTML(feed, i) {
+  const url = typeof feed === 'string' ? feed : (feed.url || '');
+  const vertical = typeof feed === 'string' ? 'General' : (feed.vertical || 'General');
+  const options = VERTICALS.map(v => `<option value="${v}" ${v === vertical ? 'selected' : ''}>${v}</option>`).join('');
   return `<div class="feed-row" id="feed-row-${i}">
-    <input type="text" value="${escHtml(url)}" id="feed-url-${i}" placeholder="https://example.com/rss" oninput="updateFeedRow(${i})">
+    <input type="text" value="${escHtml(url)}" id="feed-url-${i}" placeholder="https://example.com/rss">
+    <select id="feed-vertical-${i}" style="width:110px;flex-shrink:0;font-size:12px;padding:7px 6px">${options}</select>
     <button class="btn btn-secondary btn-sm" onclick="testFeed(${i})">Test</button>
     <span class="feed-status" id="feed-status-${i}"></span>
     <button class="dismiss-btn" onclick="removeFeedRow(${i})" title="Remove">✕</button>
@@ -775,19 +793,20 @@ function addFeedRow() {
   const rows = mgr.querySelectorAll('.feed-row');
   const i = rows.length;
   const div = document.createElement('div');
-  div.innerHTML = feedRowHTML('', i);
+  div.innerHTML = feedRowHTML({ url: '', vertical: 'General' }, i);
   mgr.appendChild(div.firstElementChild);
 }
 
 function removeFeedRow(i) {
   const row = document.getElementById('feed-row-' + i);
   if (row) row.remove();
-  // Re-index remaining rows
   const mgr = document.getElementById('rss-feed-manager');
   mgr.querySelectorAll('.feed-row').forEach((row, newIdx) => {
     row.id = 'feed-row-' + newIdx;
     const input = row.querySelector('input');
     if (input) input.id = 'feed-url-' + newIdx;
+    const sel = row.querySelector('select');
+    if (sel) sel.id = 'feed-vertical-' + newIdx;
     const status = row.querySelector('.feed-status');
     if (status) status.id = 'feed-status-' + newIdx;
     const testBtn = row.querySelector('.btn-secondary');
@@ -846,9 +865,10 @@ function saveSettings() {
 
   // Save RSS feeds from manager
   const feeds = [];
-  document.querySelectorAll('#rss-feed-manager .feed-row input').forEach(input => {
-    const val = input.value.trim();
-    if (val) feeds.push(val);
+  document.querySelectorAll('#rss-feed-manager .feed-row').forEach((row, i) => {
+    const url = (document.getElementById('feed-url-' + i)?.value || '').trim();
+    const vertical = document.getElementById('feed-vertical-' + i)?.value || 'General';
+    if (url) feeds.push({ url, vertical });
   });
   localStorage.setItem('rb_rss_feeds', JSON.stringify(feeds));
 
@@ -870,8 +890,10 @@ async function fetchTopics() {
 
   const promises = [];
   const rssFeeds = JSON.parse(localStorage.getItem('rb_rss_feeds') || '[]');
-  for (const url of rssFeeds) {
-    promises.push(fetchRSS(url.trim()));
+  for (const feed of rssFeeds) {
+    const url = typeof feed === 'string' ? feed : feed.url;
+    const vertical = typeof feed === 'string' ? 'General' : (feed.vertical || 'General');
+    if (url) promises.push(fetchRSS(url.trim(), vertical));
   }
 
   await Promise.allSettled(promises);
@@ -900,11 +922,47 @@ async function fetchTopics() {
 }
 
 function buildDomainPills() {
-  const domains = [...new Set(allTopics.filter(t => t.domain).map(t => t.domain))].sort();
-  const bar = document.getElementById('rss-pills-bar');
-  bar.innerHTML = `<span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0">Sources:</span>
-    <button class="filter-btn ${activeDomains.has('all') ? 'active' : ''}" data-domain="all" onclick="toggleDomainFilter('all', this)">All</button>
-    ${domains.map(d => `<button class="filter-btn ${activeDomains.has(d) ? 'active' : ''}" data-domain="${d}" onclick="toggleDomainFilter('${d}', this)">${d}</button>`).join('')}`;
+  // Build vertical pills from verticals that have at least one loaded topic
+  const usedVerticals = [...new Set(allTopics.filter(t => t.vertical).map(t => t.vertical))].sort();
+  const vBar = document.getElementById('vertical-pills-bar');
+  vBar.innerHTML = `<span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0;min-width:90px">Site Vertical:</span>
+    <button class="filter-btn ${activeVerticals.has('all') ? 'active' : ''}" data-vertical="all" onclick="toggleVerticalFilter('all',this)">All</button>
+    ${usedVerticals.map(v => `<button class="filter-btn ${activeVerticals.has(v) ? 'active' : ''}" data-vertical="${escHtml(v)}" onclick="toggleVerticalFilter('${escHtml(v)}',this)">${escHtml(v)}</button>`).join('')}`;
+
+  // Build domain pills — only show domains currently visible given vertical filter
+  const visibleDomains = [...new Set(
+    allTopics.filter(t => t.domain && (activeVerticals.has('all') || activeVerticals.has(t.vertical))).map(t => t.domain)
+  )].sort();
+  const dBar = document.getElementById('rss-pills-bar');
+  dBar.innerHTML = `<span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;flex-shrink:0;min-width:90px">Sources:</span>
+    <button class="filter-btn ${activeDomains.has('all') ? 'active' : ''}" data-domain="all" onclick="toggleDomainFilter('all',this)">All</button>
+    ${visibleDomains.map(d => `<button class="filter-btn ${activeDomains.has(d) ? 'active' : ''}" data-domain="${d}" onclick="toggleDomainFilter('${d}',this)">${d}</button>`).join('')}`;
+}
+
+function toggleVerticalFilter(vertical, btn) {
+  if (vertical === 'all') {
+    activeVerticals = new Set(['all']);
+    document.querySelectorAll('#vertical-pills-bar .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  } else {
+    activeVerticals.delete('all');
+    document.querySelector('#vertical-pills-bar [data-vertical="all"]')?.classList.remove('active');
+    if (activeVerticals.has(vertical)) {
+      activeVerticals.delete(vertical);
+      btn.classList.remove('active');
+      if (activeVerticals.size === 0) {
+        activeVerticals.add('all');
+        document.querySelector('#vertical-pills-bar [data-vertical="all"]')?.classList.add('active');
+      }
+    } else {
+      activeVerticals.add(vertical);
+      btn.classList.add('active');
+    }
+  }
+  // Reset domain filter when vertical changes
+  activeDomains = new Set(['all']);
+  buildDomainPills();
+  filterTopics();
 }
 
 function toggleDomainFilter(domain, btn) {
@@ -931,7 +989,7 @@ function toggleDomainFilter(domain, btn) {
 }
 
 
-async function fetchRSS(feedUrl) {
+async function fetchRSS(feedUrl, vertical = 'General') {
   try {
     const domain = extractDomain(feedUrl);
     const text = await rssFetch(feedUrl);
@@ -950,7 +1008,7 @@ async function fetchRSS(feedUrl) {
         title: cleanTitle,
         source: 'rss',
         domain: domain,
-        category: guessCategoryName(cleanTitle),
+        vertical: vertical,
         url: link,
         publishedAt: parsedDate && !isNaN(parsedDate) ? parsedDate : null,
         listicle: false,
@@ -973,10 +1031,12 @@ function renderTopics() {
   const search = document.getElementById('search-input').value.toLowerCase();
   let filtered = allTopics.filter(t => {
     if (t.dismissed) return false;
-    if (!activeDomains.has('all')) {
-      if (t.source === 'manual') return false;
-      if (!activeDomains.has(t.domain)) return false;
+    if (t.source === 'manual') {
+      // Manual topics always show unless a specific vertical/domain is selected
+      return activeDomains.has('all') && activeVerticals.has('all');
     }
+    if (!activeVerticals.has('all') && !activeVerticals.has(t.vertical)) return false;
+    if (!activeDomains.has('all') && !activeDomains.has(t.domain)) return false;
     if (search && !t.title.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1023,11 +1083,16 @@ function topicRowHTML(t) {
     ? `<a class="topic-title-link" href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.title)}</a>`
     : `<span class="topic-title">${escHtml(t.title)}</span>`;
 
+  const verticalTag = t.vertical && t.vertical !== 'General'
+    ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(240,192,64,0.08);color:var(--accent);border:1px solid rgba(240,192,64,0.2)">${escHtml(t.vertical)}</span>`
+    : '';
+
   return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
     <div class="topic-body">
       <div class="topic-title-row">
         ${titleHTML}
         <span class="source-badge ${badgeClass}">${badgeLabel}</span>
+        ${verticalTag}
         ${timeStr ? `<span class="topic-time" style="color:${tColor}" title="${t.publishedAt ? t.publishedAt.toLocaleString() : ''}">${timeStr}</span>` : ''}
         ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
         ${statusHTML}
