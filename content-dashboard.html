@@ -195,16 +195,6 @@
   .controls-bar {
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
   }
-  .search-wrap {
-    flex: 1;
-    min-width: 200px;
-    position: relative;
-  }
-  .search-wrap input { padding-left: 34px; }
-  .search-icon {
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: var(--muted); pointer-events: none; font-size: 14px;
-  }
   .source-filters { display: flex; gap: 6px; }
   .filter-btn {
     padding: 7px 13px;
@@ -475,16 +465,71 @@
 
   .feed-row {
     display: flex; align-items: center; gap: 8px;
-    margin-bottom: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin-bottom: 5px;
+    transition: border-color 0.15s;
   }
-  .feed-row input { flex: 1; font-size: 12px; padding: 7px 10px; }
+  .feed-row:hover { border-color: var(--accent-border); }
+  .feed-row.feed-dead { border-color: var(--danger); background: var(--danger-dim); opacity: 0.8; }
+  .feed-row input { flex: 1; font-size: 12px; padding: 5px 8px; min-width: 0; }
   .feed-status {
     font-size: 11px; font-weight: 600;
-    white-space: nowrap; min-width: 60px; text-align: center;
+    white-space: nowrap; min-width: 72px; text-align: center;
   }
   .feed-status.ok { color: var(--success); }
   .feed-status.fail { color: var(--danger); }
-  .feed-status.testing { color: var(--warn); }
+  .feed-status.stale { color: var(--warn); }
+  .feed-status.testing { color: var(--muted); }
+
+  .feed-group { margin-bottom: 16px; }
+  .feed-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 4px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .feed-group-header h4 {
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .feed-group-header .feed-count {
+    font-size: 10px;
+    background: var(--surface3);
+    color: var(--muted);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-family: var(--font-body);
+  }
+  .feed-group-toggle { color: var(--muted); font-size: 12px; transition: transform 0.2s; }
+  .feed-group.collapsed .feed-group-toggle { transform: rotate(-90deg); }
+  .feed-group.collapsed .feed-group-rows { display: none; }
+
+  /* Listicle indicator badge */
+  .listicle-badge {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    font-weight: 600;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Age filter pills */
+  .age-filter { display: flex; gap: 6px; align-items: center; }
 
   .divider { height: 1px; background: var(--border); }
 </style>
@@ -545,9 +590,13 @@
 
     <div class="settings-section">
       <label>RSS Feed URLs</label>
-      <div class="settings-note" style="margin-bottom:8px">Add one feed per row. Use the Test button to verify before saving.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <div class="settings-note" style="flex:1;margin:0">Feeds grouped by vertical. Test all to find dead or stale feeds.</div>
+        <button class="btn btn-secondary btn-sm" id="check-all-btn" onclick="checkAllFeeds()">🔍 Check All Feeds</button>
+        <button class="btn btn-secondary btn-sm" onclick="removeDeadFeeds()" id="remove-dead-btn" style="display:none">🗑 Remove Dead</button>
+      </div>
       <div id="rss-feed-manager"></div>
-      <button class="btn btn-secondary btn-sm" onclick="addFeedRow()" style="margin-top:8px">+ Add Feed</button>
+      <button class="btn btn-secondary btn-sm" onclick="addFeedRow()" style="margin-top:10px">+ Add Feed</button>
     </div>
 
     <div class="divider"></div>
@@ -661,9 +710,24 @@
     </div>
 
     <!-- Search -->
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="search-input" placeholder="Search topics…" oninput="filterTopics()">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" id="search-input" placeholder="Search topics…" oninput="filterTopics()" style="flex:1">
+      <button class="btn btn-secondary btn-sm" onclick="filterTopics()">Search</button>
+    </div>
+
+    <!-- Age + Listicle filters -->
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div class="age-filter">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600">Age:</span>
+        <button class="filter-btn" data-age="7" onclick="setAgeFilter(7,this)">7 days</button>
+        <button class="filter-btn" data-age="14" onclick="setAgeFilter(14,this)">14 days</button>
+        <button class="filter-btn" data-age="30" onclick="setAgeFilter(30,this)">30 days</button>
+        <button class="filter-btn active" data-age="0" onclick="setAgeFilter(0,this)">All time</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);user-select:none">
+        <input type="checkbox" id="listicle-filter" onchange="filterTopics()" style="width:auto;accent-color:var(--accent)">
+        📋 Listicle-ready only
+      </label>
     </div>
 
     <!-- Topic List -->
@@ -712,7 +776,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v2.5';
+const VERSION = 'v2.7';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -781,7 +845,22 @@ const VERTICALS = ['General','Autos','Entertainment','Fashion','Finance','Food',
 let allTopics = [];
 let activeDomains = new Set(['all']);
 let activeVerticals = new Set(['all']);
+let activeAgeDays = 0; // 0 = all time
 let isGenerating = false;
+
+const LISTICLE_NUMBERS = /\b\d+\b/;
+const LISTICLE_WORDS = /\b(best|worst|top|ways|things|reasons|tips|tricks|mistakes|secrets|signs|facts|ideas|steps|habits|foods|places|movies|shows|books|games|apps|tools|products|questions|rules|myths|lessons|benefits|effects|causes|types|examples|surprising|amazing|incredible|shocking|genius|simple|easy|proven|essential|important|common|unusual|rare)\b/i;
+
+function isListicleReady(title) {
+  return LISTICLE_NUMBERS.test(title) || LISTICLE_WORDS.test(title);
+}
+
+function setAgeFilter(days, btn) {
+  activeAgeDays = days;
+  document.querySelectorAll('.age-filter .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterTopics();
+}
 
 const FETCH_SERVER = 'https://tools.nativemetrics-svc.com/fetch-article?url=';
 
@@ -905,7 +984,33 @@ function openSettings(isFirstRun = false) {
 
 function renderFeedManager(feeds) {
   const mgr = document.getElementById('rss-feed-manager');
-  mgr.innerHTML = feeds.map((f, i) => feedRowHTML(f, i)).join('');
+  // Group feeds by vertical
+  const groups = {};
+  VERTICALS.forEach(v => { groups[v] = []; });
+  feeds.forEach((f, i) => {
+    const v = (typeof f === 'string' ? 'General' : f.vertical) || 'General';
+    if (!groups[v]) groups[v] = [];
+    groups[v].push({ feed: f, idx: i });
+  });
+  let html = '';
+  VERTICALS.forEach(v => {
+    if (!groups[v] || groups[v].length === 0) return;
+    html += `<div class="feed-group" id="feed-group-${v}">
+      <div class="feed-group-header" onclick="toggleFeedGroup('${v}')">
+        <h4>${v} <span class="feed-count">${groups[v].length}</span></h4>
+        <span class="feed-group-toggle">▾</span>
+      </div>
+      <div class="feed-group-rows">
+        ${groups[v].map(({ feed, idx }) => feedRowHTML(feed, idx)).join('')}
+      </div>
+    </div>`;
+  });
+  mgr.innerHTML = html || '<p style="color:var(--muted);font-size:13px">No feeds saved yet. Click + Add Feed to get started.</p>';
+}
+
+function toggleFeedGroup(v) {
+  const group = document.getElementById('feed-group-' + v);
+  if (group) group.classList.toggle('collapsed');
 }
 
 function feedRowHTML(feed, i) {
@@ -914,32 +1019,43 @@ function feedRowHTML(feed, i) {
   const options = VERTICALS.map(v => `<option value="${v}" ${v === vertical ? 'selected' : ''}>${v}</option>`).join('');
   return `<div class="feed-row" id="feed-row-${i}">
     <input type="text" value="${escHtml(url)}" id="feed-url-${i}" placeholder="https://example.com/rss">
-    <select id="feed-vertical-${i}" style="width:110px;flex-shrink:0;font-size:12px;padding:7px 6px">${options}</select>
-    <button class="btn btn-secondary btn-sm" onclick="testFeed(${i})">Test</button>
+    <select id="feed-vertical-${i}" style="width:100px;flex-shrink:0;font-size:11px;padding:5px 4px" onchange="reassignFeedVertical(${i}, this.value)">${options}</select>
+    <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 8px" onclick="testFeed(${i})">Test</button>
     <span class="feed-status" id="feed-status-${i}"></span>
     <button class="dismiss-btn" onclick="removeFeedRow(${i})" title="Remove">✕</button>
   </div>`;
 }
 
+function reassignFeedVertical(i, newVertical) {
+  // Move feed to correct group visually after vertical change
+  // Actual save happens on Save Settings
+}
+
 function addFeedRow() {
-  const mgr = document.getElementById('rss-feed-manager');
-  const rows = mgr.querySelectorAll('.feed-row');
-  const i = rows.length;
-  const div = document.createElement('div');
-  div.innerHTML = feedRowHTML({ url: '', vertical: 'General' }, i);
-  mgr.appendChild(div.firstElementChild);
+  // Add to the end of the General group, or create it
+  const saved = getCurrentFeedsFromUI();
+  saved.push({ url: '', vertical: 'General' });
+  renderFeedManager(saved);
+  // Focus the new input
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#rss-feed-manager .feed-row input[type="text"]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
 }
 
 function removeFeedRow(i) {
   const row = document.getElementById('feed-row-' + i);
   if (row) row.remove();
-  const mgr = document.getElementById('rss-feed-manager');
-  mgr.querySelectorAll('.feed-row').forEach((row, newIdx) => {
+  reindexFeedRows();
+}
+
+function reindexFeedRows() {
+  document.querySelectorAll('#rss-feed-manager .feed-row').forEach((row, newIdx) => {
     row.id = 'feed-row-' + newIdx;
-    const input = row.querySelector('input');
+    const input = row.querySelector('input[type="text"]');
     if (input) input.id = 'feed-url-' + newIdx;
     const sel = row.querySelector('select');
-    if (sel) sel.id = 'feed-vertical-' + newIdx;
+    if (sel) { sel.id = 'feed-vertical-' + newIdx; sel.setAttribute('onchange', `reassignFeedVertical(${newIdx}, this.value)`); }
     const status = row.querySelector('.feed-status');
     if (status) status.id = 'feed-status-' + newIdx;
     const testBtn = row.querySelector('.btn-secondary');
@@ -949,11 +1065,21 @@ function removeFeedRow(i) {
   });
 }
 
-function updateFeedRow(i) { /* value read on save */ }
+function getCurrentFeedsFromUI() {
+  const feeds = [];
+  document.querySelectorAll('#rss-feed-manager .feed-row').forEach((row, i) => {
+    const url = (document.getElementById('feed-url-' + i)?.value || '').trim();
+    const vertical = document.getElementById('feed-vertical-' + i)?.value || 'General';
+    if (url) feeds.push({ url, vertical });
+    else if (!url) feeds.push({ url: '', vertical }); // keep empty rows for addFeedRow
+  });
+  return feeds.filter(f => f.url !== '' || true); // keep all for rendering, filter on save
+}
 
 async function testFeed(i) {
   const input = document.getElementById('feed-url-' + i);
   const status = document.getElementById('feed-status-' + i);
+  const row = document.getElementById('feed-row-' + i);
   const url = input?.value.trim();
   if (!url) return;
   status.textContent = 'Testing…';
@@ -963,18 +1089,64 @@ async function testFeed(i) {
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
-    if (items.length > 0) {
-      status.textContent = `✓ ${items.length} items`;
-      status.className = 'feed-status ok';
-    } else {
+    if (items.length === 0) {
       status.textContent = '✗ No items';
       status.className = 'feed-status fail';
+      row?.classList.add('feed-dead');
+      return;
+    }
+    // Check freshness of most recent item
+    const firstPubDate = items[0].querySelector('pubDate')?.textContent;
+    const lastDate = firstPubDate ? new Date(firstPubDate) : null;
+    const daysSince = lastDate ? (Date.now() - lastDate.getTime()) / 86400000 : 999;
+    if (daysSince > 60) {
+      const months = Math.round(daysSince / 30);
+      status.textContent = `⚠ Stale (${months}mo)`;
+      status.className = 'feed-status stale';
+      row?.classList.add('feed-dead');
+    } else {
+      const daysAgo = Math.round(daysSince);
+      status.textContent = `✓ ${items.length} items · ${daysAgo}d ago`;
+      status.className = 'feed-status ok';
+      row?.classList.remove('feed-dead');
     }
   } catch(e) {
     status.textContent = '✗ Failed';
     status.className = 'feed-status fail';
+    row?.classList.add('feed-dead');
+  }
+  // Show remove dead button if any dead feeds found
+  const hasDead = document.querySelectorAll('.feed-row.feed-dead').length > 0;
+  document.getElementById('remove-dead-btn').style.display = hasDead ? '' : 'none';
+}
+
+async function checkAllFeeds() {
+  const btn = document.getElementById('check-all-btn');
+  btn.textContent = '⏳ Checking…';
+  btn.disabled = true;
+  const rows = document.querySelectorAll('#rss-feed-manager .feed-row');
+  for (let i = 0; i < rows.length; i++) {
+    await testFeed(i);
+  }
+  btn.textContent = '🔍 Check All Feeds';
+  btn.disabled = false;
+  const deadCount = document.querySelectorAll('.feed-row.feed-dead').length;
+  if (deadCount > 0) {
+    document.getElementById('remove-dead-btn').style.display = '';
+    showToast(`${deadCount} dead or stale feed${deadCount !== 1 ? 's' : ''} found — click Remove Dead to clean up.`, 'error');
+  } else {
+    showToast('All feeds look healthy!', 'success');
   }
 }
+
+function removeDeadFeeds() {
+  const dead = document.querySelectorAll('.feed-row.feed-dead');
+  dead.forEach(row => row.remove());
+  reindexFeedRows();
+  document.getElementById('remove-dead-btn').style.display = 'none';
+  showToast(`Removed ${dead.length} dead feed${dead.length !== 1 ? 's' : ''}. Don't forget to Save Settings.`, 'success');
+}
+
 
 function closeSettings() {
   document.getElementById('settings-overlay').classList.remove('open');
@@ -1004,7 +1176,6 @@ function saveSettings() {
     if (url) feeds.push({ url, vertical });
   });
   localStorage.setItem('rb_rss_feeds', JSON.stringify(feeds));
-
   closeSettings();
   showToast('Settings saved!', 'success');
 }
@@ -1162,14 +1333,21 @@ function extractDomain(url) {
 function renderTopics() {
   const list = document.getElementById('topic-list');
   const search = document.getElementById('search-input').value.toLowerCase();
+  const listicleOnly = document.getElementById('listicle-filter')?.checked;
+  const now = Date.now();
+
   let filtered = allTopics.filter(t => {
     if (t.dismissed) return false;
     if (t.source === 'manual') {
-      // Manual topics always show unless a specific vertical/domain is selected
       return activeDomains.has('all') && activeVerticals.has('all');
     }
     if (!activeVerticals.has('all') && !activeVerticals.has(t.vertical)) return false;
     if (!activeDomains.has('all') && !activeDomains.has(t.domain)) return false;
+    if (activeAgeDays > 0 && t.publishedAt) {
+      const daysSince = (now - t.publishedAt.getTime()) / 86400000;
+      if (daysSince > activeAgeDays) return false;
+    }
+    if (listicleOnly && !isListicleReady(t.title)) return false;
     if (search && !t.title.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1177,7 +1355,7 @@ function renderTopics() {
   document.getElementById('topic-count').textContent = `${filtered.length} topic${filtered.length !== 1 ? 's' : ''}`;
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>No topics found</h3><p>Try a different search or refresh</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>No topics found</h3><p>Try adjusting filters or refreshing</p></div>`;
     return;
   }
 
@@ -1216,6 +1394,10 @@ function topicRowHTML(t) {
     ? `<a class="topic-title-link" href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.title)}</a>`
     : `<span class="topic-title">${escHtml(t.title)}</span>`;
 
+  const listicleBadge = isListicleReady(t.title)
+    ? `<span class="listicle-badge">📋 Listicle</span>`
+    : '';
+
   const verticalTag = t.vertical && t.vertical !== 'General'
     ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-border)">${escHtml(t.vertical)}</span>`
     : '';
@@ -1226,6 +1408,7 @@ function topicRowHTML(t) {
         ${titleHTML}
         <span class="source-badge ${badgeClass}">${badgeLabel}</span>
         ${verticalTag}
+        ${listicleBadge}
         ${timeStr ? `<span class="topic-time" style="color:${tColor}" title="${t.publishedAt ? t.publishedAt.toLocaleString() : ''}">${timeStr}</span>` : ''}
         ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
         ${statusHTML}
