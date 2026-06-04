@@ -776,7 +776,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v2.7';
+const VERSION = 'v2.8';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -848,11 +848,12 @@ let activeVerticals = new Set(['all']);
 let activeAgeDays = 0; // 0 = all time
 let isGenerating = false;
 
-const LISTICLE_NUMBERS = /\b\d+\b/;
-const LISTICLE_WORDS = /\b(best|worst|top|ways|things|reasons|tips|tricks|mistakes|secrets|signs|facts|ideas|steps|habits|foods|places|movies|shows|books|games|apps|tools|products|questions|rules|myths|lessons|benefits|effects|causes|types|examples|surprising|amazing|incredible|shocking|genius|simple|easy|proven|essential|important|common|unusual|rare)\b/i;
+// A title is listicle-ready if it has a number directly paired with a list-intent word or plural noun phrase
+const LISTICLE_PATTERN = /\b(\d+)\s+\w*\s*(best|worst|top|ways|things|reasons|tips|tricks|mistakes|secrets|signs|facts|ideas|steps|habits|foods|places|movies|shows|books|games|apps|tools|products|questions|rules|myths|lessons|benefits|effects|causes|types|examples|surprising|amazing|incredible|shocking|genius|simple|easy|proven|essential|important|common|unusual|rare|times|photos?|videos?)\b/i;
+const LISTICLE_LEAD = /^(best|worst|top|the best|the worst)\b/i; // "Best Cars Under $30k"
 
 function isListicleReady(title) {
-  return LISTICLE_NUMBERS.test(title) || LISTICLE_WORDS.test(title);
+  return LISTICLE_PATTERN.test(title) || LISTICLE_LEAD.test(title);
 }
 
 function setAgeFilter(days, btn) {
