@@ -852,7 +852,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v3.5';
+const VERSION = 'v3.6';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -2264,8 +2264,9 @@ function logEntry(entry) {
   const log = getLog();
   log.unshift(entry);
   saveLog(log);
-  // Fire-and-forget WP log post — non-blocking
-  postLogToWP(entry).catch(e => console.warn('WP log post failed:', e));
+  // Write to WP as permanent record — works on both GitHub Pages and permanent host
+  // Read sync only works on permanent host (CORS restriction on GitHub Pages)
+  postLogToWP(entry).catch(() => {}); // silent fail — localStorage is the fallback
 }
 
 function updateLogEntry(id, updates) {
@@ -2409,11 +2410,15 @@ async function syncLogFromWP() {
 // ── HISTORY UI ──
 async function openHistory() {
   document.getElementById('history-overlay').style.display = 'flex';
-  renderHistory(); // render local immediately
-  const summaryEl = document.getElementById('history-summary');
-  summaryEl.innerHTML += ' &nbsp;<span style="color:var(--muted);font-size:11px">↻ Syncing from WordPress…</span>';
-  await syncLogFromWP();
-  renderHistory(); // re-render with synced data
+  renderHistory();
+  // WP sync only works on the permanent host (same-origin) — CORS blocks it from GitHub Pages
+  if (IS_HOSTED) {
+    const summaryEl = document.getElementById('history-summary');
+    const original = summaryEl.innerHTML;
+    summaryEl.innerHTML += ' &nbsp;<span style="color:var(--muted);font-size:11px">↻ Syncing from WordPress…</span>';
+    await syncLogFromWP();
+    renderHistory();
+  }
 }
 
 function closeHistory() {
