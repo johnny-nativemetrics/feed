@@ -516,7 +516,7 @@
 <!-- MAIN APP -->
 <div id="app">
   <header>
-    <div class="logo">ResourceBuzz <span>Content</span></div>
+    <div class="logo">ResourceBuzz <span>Content</span> <span id="version-badge" style="font-size:10px;font-weight:400;color:var(--muted);margin-left:6px"></span></div>
     <div class="header-actions">
       <button class="btn btn-secondary btn-sm refresh-btn" id="refresh-btn" onclick="fetchTopics()">
         <span class="refresh-icon">↻</span> Refresh Topics
@@ -594,6 +594,8 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
+const VERSION = 'v1.4';
+
 // ── STATE ──
 let allTopics = [];
 let activeFilter = 'all';
@@ -601,13 +603,30 @@ let isGenerating = false;
 
 const FETCH_SERVER = 'https://tools.nativemetrics-svc.com/fetch-article?url=';
 
+// For article text extraction (Node server, returns JSON with .text)
 async function proxiedFetch(url) {
   const res = await fetch(FETCH_SERVER + encodeURIComponent(url));
   if (!res.ok) throw new Error('Fetch server error: ' + res.status);
   const data = await res.json();
   if (data.error) throw new Error('blocked');
-  // Return raw text for RSS/Trends XML parsing compatibility
   return data.text || data.contents || '';
+}
+
+// For RSS/XML feeds (needs raw XML back, not Readability-parsed text)
+async function rssFetch(url) {
+  const proxies = [
+    'https://corsproxy.io/?' + encodeURIComponent(url),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text && text.includes('<item>')) return text;
+    } catch(e) { /* try next */ }
+  }
+  throw new Error('RSS fetch failed: ' + url);
 }
 
 async function fetchArticleForGeneration(url) {
@@ -649,6 +668,7 @@ document.getElementById('lock-password').addEventListener('keydown', e => { if (
 
 // Check if already set up
 window.addEventListener('load', () => {
+  document.getElementById('version-badge').textContent = VERSION;
   const saved = localStorage.getItem('rb_dash_password');
   if (!saved) { showSetup(); }
 });
@@ -732,7 +752,7 @@ async function testFeed(i) {
   status.textContent = 'Testing…';
   status.className = 'feed-status testing';
   try {
-    const text = await proxiedFetch(url);
+    const text = await rssFetch(url);
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
@@ -864,7 +884,7 @@ async function fetchReddit(subreddit) {
 async function fetchTrends() {
   try {
     const url = 'https://trends.google.com/trending/rss?geo=US';
-    const text = await proxiedFetch(url);
+    const text = await rssFetch(url);
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
@@ -891,7 +911,7 @@ async function fetchTrends() {
 async function fetchRSS(feedUrl) {
   try {
     const domain = extractDomain(feedUrl);
-    const text = await proxiedFetch(feedUrl);
+    const text = await rssFetch(feedUrl);
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'text/xml');
     const items = xml.querySelectorAll('item');
