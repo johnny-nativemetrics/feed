@@ -244,6 +244,8 @@
 
   .topic-row:hover { border-color: var(--surface3); background: var(--surface2); }
   .topic-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .topic-row.topic-done { opacity: 0.6; }
+  .topic-row.topic-done:hover { opacity: 1; }
   .topic-row.dismissed { display: none; }
 
   .topic-select { padding-top: 2px; flex-shrink: 0; }
@@ -850,7 +852,7 @@ const WP_CATEGORIES = [
   { id: 1, name: "Uncategorized", keywords: [] }
 ];
 
-const VERSION = 'v3.0';
+const VERSION = 'v3.2';
 
 /*
   ── SERVER DEPLOYMENT SPEC FOR SHAZHAIB ──────────────────────────────────────
@@ -1406,6 +1408,7 @@ function extractDomain(url) {
 
 // ── RENDER ──
 function renderTopics() {
+  invalidateGeneratedCache(); // Refresh log cache each render
   const list = document.getElementById('topic-list');
   const search = document.getElementById('search-input').value.toLowerCase();
   const listicleOnly = document.getElementById('listicle-filter')?.checked;
@@ -1458,6 +1461,22 @@ function timeColor(date) {
 }
 
 
+// Build a Set of already-generated source URLs from the log for fast lookup
+function getGeneratedUrls() {
+  const log = getLog();
+  const urls = new Set();
+  log.forEach(e => { if (e.sourceUrl) urls.add(e.sourceUrl.trim()); });
+  return urls;
+}
+
+// Cache it per render cycle so we don't re-parse the log for every row
+let _generatedUrlsCache = null;
+function generatedUrlsCache() {
+  if (!_generatedUrlsCache) _generatedUrlsCache = getGeneratedUrls();
+  return _generatedUrlsCache;
+}
+function invalidateGeneratedCache() { _generatedUrlsCache = null; }
+
 function topicRowHTML(t) {
   const badgeClass = { reddit: 'badge-reddit', trends: 'badge-trends', rss: 'badge-rss', manual: 'badge-manual' }[t.source] || 'badge-manual';
   const badgeLabel = { reddit: t.subreddit ? `r/${t.subreddit}` : 'Reddit', trends: '📈 Trends', rss: t.domain || 'RSS', manual: 'Custom' }[t.source] || 'Custom';
@@ -1473,17 +1492,23 @@ function topicRowHTML(t) {
     ? `<span class="listicle-badge">📋 Listicle</span>`
     : '';
 
+  const alreadyDone = t.url && generatedUrlsCache().has(t.url.trim());
+  const doneBadge = alreadyDone
+    ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--success-dim);color:var(--success);border:1px solid rgba(76,175,125,0.25)" title="Already generated from this source">✓ Done</span>`
+    : '';
+
   const verticalTag = t.vertical && t.vertical !== 'General'
     ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-border)">${escHtml(t.vertical)}</span>`
     : '';
 
-  return `<div class="topic-row ${isSelected ? 'selected' : ''}" id="row-${t.id}">
+  return `<div class="topic-row ${isSelected ? 'selected' : ''} ${alreadyDone ? 'topic-done' : ''}" id="row-${t.id}">
     <div class="topic-body">
       <div class="topic-title-row">
         ${titleHTML}
         <span class="source-badge ${badgeClass}">${badgeLabel}</span>
         ${verticalTag}
         ${listicleBadge}
+        ${doneBadge}
         ${timeStr ? `<span class="topic-time" style="color:${tColor}" title="${t.publishedAt ? t.publishedAt.toLocaleString() : ''}">${timeStr}</span>` : ''}
         ${t.meta ? `<span style="font-size:11px;color:var(--muted)">${t.meta}</span>` : ''}
         ${statusHTML}
@@ -1502,7 +1527,13 @@ function topicRowHTML(t) {
           value="${escHtml(t.angle)}"
           onchange="updateAngle('${t.id}', this.value)"
           oninput="updateAngle('${t.id}', this.value)">
-        <button class="btn btn-secondary btn-sm" id="angle-btn-${t.id}" style="flex-shrink:0;font-size:11px;padding:5px 10px;white-space:nowrap" onclick="generateAngle('${t.id}', ${JSON.stringify(t.title)}, ${JSON.stringify(t.domain||'')}, ${JSON.stringify(t.vertical||'')})">✨ Angle</button>
+        <button class="btn btn-secondary btn-sm" id="angle-btn-${t.id}" 
+          style="flex-shrink:0;font-size:11px;padding:5px 10px;white-space:nowrap" 
+          data-topicid="${escHtml(t.id)}"
+          data-title="${escHtml(t.title)}"
+          data-domain="${escHtml(t.domain||'')}"
+          data-vertical="${escHtml(t.vertical||'')}"
+          onclick="handleAngleClick(this)">✨ Angle</button>
       </div>
     </div>
   </div>`;
@@ -1685,6 +1716,14 @@ async function generateManual() {
   }
 }
 
+function handleAngleClick(btn) {
+  const id = btn.dataset.topicid;
+  const title = btn.dataset.title;
+  const domain = btn.dataset.domain;
+  const vertical = btn.dataset.vertical;
+  generateAngle(id, title, domain, vertical);
+}
+
 // ── GENERATE ANGLE ──
 async function generateAngle(topicId, title, domain, vertical) {
   const apiKey = localStorage.getItem('rb_openai');
@@ -1790,6 +1829,7 @@ async function generateSelected() {
   showToast(`Done! ${jobs.length} article${jobs.length !== 1 ? 's' : ''} pushed to WordPress drafts.`, 'success');
   // Reset selections after generation so count clears
   allTopics.forEach(t => { t.listicle = false; t.article = false; t.angle = ''; });
+  invalidateGeneratedCache();
   updateSelectedCount();
   filterTopics();
 }
